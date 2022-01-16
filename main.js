@@ -1,6 +1,8 @@
 const {Client, Intents} = require("discord.js");
 require("dotenv").config();
 
+const helper = require("./helper");
+
 const bot = new Client({intents:[
     Intents.FLAGS.GUILDS,
     Intents.FLAGS.GUILD_MESSAGES,
@@ -11,18 +13,22 @@ const bot = new Client({intents:[
 
 const PREFIX = "--";
 
-bot.once("ready", () => {
+bot.once("ready", async () => {
+	console.log(helper.t1());
+	console.log(await helper.t2());
     console.log(`Logged in as ${bot.user.tag}`);
 });
 
-bot.on("messageCreate", message => {
-    if (!message.content.startsWith(PREFIX)) {console.log("PREFIX");}
-    else if (message.author.bot) {console.log("BOT");}
-    else {
-        console.log(message.content);
-        
+bot.on("messageCreate", (message) => {
+    if (!message.author.bot && message.content.startsWith(PREFIX)) {
+        console.log(message.author.discriminator, message.content);
+
         const command = message.content.slice(PREFIX.length).toLowerCase();
-        message.reply(command);
+
+		if (command == "quit") {bot.destroy();}
+		else {
+        	bot.channels.cache.get(process.env.TEST_CHANNEL).send(command);
+		}
     }
 });
 
