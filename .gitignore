@@ -1,3 +1,5 @@
-.env
-package-lock.json
+assets/placeholder/
 node_modules/
+.env
+map.png
+package-lock.json
