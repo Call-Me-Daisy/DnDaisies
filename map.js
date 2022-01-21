@@ -2,62 +2,51 @@ const fs = require('fs')
 const { createCanvas, loadImage } = require('canvas')
 
 const TEAM = new Map([
-	["p", "#0f0"],
-	["a", "#00f"],
-	["e", "#f00"],
-	["n", "#000"]
+	["o", "#222"],
+	["e", "#f33"],
+	["p", "#3f3"],
+	["a", "#38f"],
+	["n", "#640"]
 ]);
 
 class DaisyChar {
-	constructor(_team, _posH = 1, _posV = 1, _visible = false) {
-		this.team = TEAM.get(_team.charAt(0).toLowerCase());
+	constructor(_team, _pos, _visible = false) {
+		this.team = TEAM.get(_team[0].toLowerCase());
 		if (this.team === undefined) {throw "Invalid _team for DaisyChar!";}
 
-		this.pos = Array.of(_posH, _posV);
+		this.pos = _pos;
 		this.visible = _visible;
-	}
-
-	copy(_pos = undefined, _visible = undefined) {
-		if (_pos = undefined) {_pos = this.pos;}
-		if (_visible = undefined) {_visible = this.visible;}
-		return DaisyChar(this.team, _pos[0], _pos[1], _visible);
 	}
 
 	moveTo(_pos) {
 		this.pos = _pos;
 	}
-	moveBy(_dir) {
-		this.pos[0] += _dir[0];
-		this.pos[1] += _dir[1];
-	}
 }
 
 class DaisyMap {
-	constructor(_H, _V, _pS, _pM) {
+	constructor(_H, _V, _pH, _pV, _pM = NaN) {
 		this.dims = [_H, _V];
-		this.pS = _pS;
-		this.pM = _pM;
+		this.pS = (_pH/_H < _pV/_V) ? Math.floor(_pH/_H) : Math.floor(_pV/_V);
+		this.pM = (isNaN(_pM)) ? Math.ceil(this.pS/64) : _pM;
 		this.chars = new Map();
-		this.assets = [];
 
-		this.canvas = createCanvas((1+_H)*_pS, (1+_V)*_pS);
+		this.canvas = createCanvas((1+_H)*this.pS, (1+_V)*this.pS);
 		this.context = this.canvas.getContext("2d");
 	}
 
 	addChar(charName, char) {
-		this.chars.set(charName, char);
+		const ls = this.chars.get(charName);
+		if (ls !== undefined) {ls.push(char);}
+		else {this.chars.set(charName, [char]);}
 	}
 	addCharCheck(charName, char) {
 		if (char.pos[0] >= 0 && char.pos[0] <= this.dims[0] &&
 			char.pos[1] >= 0 && char.pos[1] <= this.dims[1] ) {this.addChar(charName, char);}
-		else {throw "Index out of range!"}
+		else {throw `Char ${charName} not on map!`;}
 	}
 	getChar(charName) {
-		return this.chars.get(charName);
-	}
-	getCharCheck(charName) {
-		if (this.getChar(charName) === undefined) {throw "Char by that name is not registered!";}
-		return this.getChar(charName);
+		if (this.chars.get(charName) === undefined) {throw `Char ${CharName} not registered!`;}
+		return this.chars.get(charName)[0];
 	}
 
 	fillCell(h, v) {
@@ -86,29 +75,25 @@ class DaisyMap {
 		for (let h = 1; h <= this.dims[0]; h++) {this.writeCell(h.toString(), h, 0);}
 	}
 
-	newMap(_H, _V) {
-
-	}
-
 	buildMap() {
 		this.prepMap();
 
-		for (const [charName, char] of this.chars.entries()) {
-			if (char.visible) {
-				this.context.fillStyle = char.team;
-				this.fillCell(char.pos[0], char.pos[1]);
-				this.context.fillStyle = "#000";
-				this.writeCell(charName.substring(0,2), char.pos[0], char.pos[1]);
-			}
+		var charCode, many;
+		for (const [charName, charLs] of this.chars.entries()) {
+			charCode = charName[0] + charName[charName.length-1];
+			many = (charLs.length > 1);
+
+			charLs.forEach((char, i) => {
+				if (char.visible) {
+					this.context.fillStyle = char.team;
+					this.fillCell(char.pos[0], char.pos[1]);
+					this.context.fillStyle = "#000";
+					this.writeCell((many) ? charCode + (i+1).toString() : charCode, char.pos[0], char.pos[1]);
+				}
+			});
 		}
 
-		fs.writeFileSync("./map.png", this.canvas.toBuffer("image/png"));
-	}
-
-	async fetchBuffer() {
-		const canvas = createCanvas(this.canvas.width, this.canvas.height);
-		canvas.getContext("2d").drawImage(await loadImage("./map.png"), 0, 0, this.canvas.width, this.canvas.height)
-		return canvas.toBuffer("image/png");
+		return this.canvas.toBuffer("image/png");
 	}
 }
 
