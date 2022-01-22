@@ -3,9 +3,9 @@ require("dotenv").config();
 const { Client, Intents, MessageAttachment} = require("discord.js");
 const {createCanvas, loadImage} = require ("canvas");
 const {DaisyMap, DaisyChar} = require("./map");
-//const HELP = require("./help");
+const {helpSwitch} = require("./help");
 
-//--------------------------------------------------------------------CONSTANTS
+//--------------------------------------------------------------------GLOBALS
 const bot = new Client({intents:[
     Intents.FLAGS.GUILDS,
     Intents.FLAGS.GUILD_MESSAGES,
@@ -14,8 +14,9 @@ const bot = new Client({intents:[
     Intents.FLAGS.DIRECT_MESSAGE_REACTIONS]
 });
 
-const PREFIX = "--";
 const allMaps = new Map();
+const HELPTIMER = 3000;
+const PREFIX = "--";
 
 //--------------------------------------------------------------------HELPERS
 function capitalCase(str) {
@@ -24,15 +25,18 @@ function capitalCase(str) {
 function sendTo(id, message) {
 	return bot.channels.cache.get(id).send(message);
 }
-function sendTemp(id, message, duration = 5000) {
+function sendTemp(id, message, duration = HELPTIMER) {
 	sendTo(id, message).then(msg => {
 		setTimeout(() => msg.delete(), duration);
 	});
 }
 //--------------------------------------------------------------------DECLUTTERING
 //------------------------------------DO
+function doHelp(id, command) {
+	sendTemp(id, helpSwitch(PREFIX, command), HELPTIMER);
+}
 function doQuit(id, command) {
-	setTimeout(function() {bot.destroy();}, 1500);
+	setTimeout(function() {bot.destroy();}, 2*HELPTIMER);
 }
 function doPing(id, command) {
 	sendTo(id, "pong\t(" + (Date.now()-message.createdTimestamp).toString() + "ms)");
@@ -101,7 +105,7 @@ function tryMove(id, command) {
 //--------------------------------------------------------------------MAIN
 bot.once("ready", () => {
 	console.log(`Logged in as ${bot.user.tag}`);
-	//sendTo(process.env.TEST_CHANNEL, process.env.TEST_COMMAND);
+	//sendTemp(process.env.TEST_CHANNEL, process.env.TEST_COMMAND, 2*HELPTIMER);
 });
 
 bot.on("messageCreate", (message) => {
@@ -116,15 +120,22 @@ bot.on("messageCreate", (message) => {
 				const command = messageLine.slice(PREFIX.length).split(" ");
 
 				switch (command[0].toLowerCase()) {
+					case "help": doHelp(message.channel.id, command); break; //an exception here should never occur
 					case "quit": doQuit(message.channel.id, command); break; //an exception here should never occur
-					//case "help": doHelp(message.channel.id, command); break; //an exception here should never occur
 					case "ping": doPing(message.channel.id, command); break; //an exception here should never occur
+					case "newmap":
 					case "new": tryNew(message.channel.id, command); break;
+					case "reveal":
 					case "hide": tryHide(message.channel.id, command); break;
+					case "newtile":
 					case "add": tryAdd(message.channel.id, command); break;
+					case "newgroup":
+					case "newtiles":
 					case "addmany": tryAddMany(message.channel.id, command); break;
+					case "newarea":
 					case "addarea": tryAddArea(message.channel.id, command); break;
 					case "move": tryMove(message.channel.id, command); break;
+					case "display":
 					case "map": await doMap(message.channel.id, command); break; //an exception here shows a fatal error.
 
 					default: sendTo(message.channel.id, messageLine.slice(PREFIX.length));

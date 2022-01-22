@@ -2,4 +2,3 @@ assets/placeholder/
 node_modules/
 .env
 package-lock.json
-help.js
