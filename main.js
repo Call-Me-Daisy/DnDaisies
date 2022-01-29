@@ -15,7 +15,8 @@ const bot = new Client({intents:[
 });
 
 const allMaps = new Map();
-const HELPTIMER = 3000;
+const allDisplays = new Map();
+const HELPTIMER = 15000;
 const PREFIX = "--";
 
 //--------------------------------------------------------------------HELPERS
@@ -31,76 +32,86 @@ function sendTemp(id, message, duration = HELPTIMER) {
 	});
 }
 //--------------------------------------------------------------------DECLUTTERING
-//------------------------------------DO
 function doHelp(id, command) {
-	sendTemp(id, helpSwitch(PREFIX, command), HELPTIMER);
-}
-function doQuit(id, command) {
-	setTimeout(function() {bot.destroy();}, 2*HELPTIMER);
-}
-function doPing(id, command) {
-	sendTo(id, "pong\t(" + (Date.now()-message.createdTimestamp).toString() + "ms)");
-}
-function doNew(id, command) {
-	while(command.length < 5) {command.push(undefined);}
-	allMaps.set(id, new DaisyMap(command[1], command[2], command[3], command[4]));
-}
-function doHide(id, command) {
-	allMaps.get(id).getChar(command[1]).visible = !allMaps.get(id).getChar(command[1]).visible;
-}
-function doAdd(id, command) {
-	allMaps.get(id).addChar(capitalCase(command[2]), new DaisyChar(command[1], command[3], true));
-}
-function doAddMany(id, command) {
-	const thisMap = allMaps.get(id);
-	const charName = capitalCase(command[2]);
-	command[3].split(",").forEach((coord, i) => {
-		thisMap.addChar(charName, new DaisyChar(command[1], coord, true));
-	});
-}
-function doAddArea(id, command) {
-	allMaps.get(id).addArea(command[1], command[2]);
-}
-function doMove(id, command) {
-	const char = allMaps.get(id).getChar(capitalCase(command[1]))[command[2]];
-	char.moveTo(command[3]);
-	//if (char.visible) {doMap(id, command);}
-}
-async function doMap(id, command) {
-	sendTo(id, {
-		files: [new MessageAttachment(await allMaps.get(id).buildMap(), id + "_map.png")]
-	})
-}
-//------------------------------------TRY
-function tryNew(id, command) {
-	try {doNew(id, command);} catch (err) {
-		sendTemp(id, "Error. Please format as follows:\n\t--new [letter][number]")
+	try {
+		sendTemp(id, helpSwitch(PREFIX, command), HELPTIMER);
+	} catch (err) {
+		sendTemp("Unknown Error.");
 	}
 }
-function tryHide(id, command) {
-	try {doHide(id, command);} catch (err) {
+function doQuit(id, command) {
+	try {
+		setTimeout(function() {bot.destroy();}, 2*HELPTIMER);
+	} catch (err) {
+		sendTemp("Unknown Error.");
+	}
+}
+function doPing(id, command) {
+	try {
+		sendTo(id, "pong\t(" + (Date.now()-message.createdTimestamp).toString() + "ms)");
+	} catch (err) {
+		sendTemp("Unknown Error.");
+	}
+}
+function doClean(id, command) {
+	try {
+		//TO-DO
+	} catch (err) {
+		sendTemp(id, "Unknown Error.");
+	}
+}
+function doNew(id, command) {
+	try {
+		while(command.length < 5) {command.push(undefined);}
+		allMaps.set(id, new DaisyMap(command[1], command[2], command[3], command[4]));
+	} catch (err) {
+		sendTemp(id, "Error. Please format as follows:\n\t--new [letter][number]");
+	}
+}
+function doHide(id, command) {
+	try {
+		const char = allMaps.get(id).getChar(command[1])
+		char.visible = !char.visible;
+	} catch (err) {
 		sendTemp(id, "Error. Please format as follows:\n\t--hide [name]")
 	}
 }
-function tryAdd(id, command) {
-	try {doAdd(id, command);} catch (err) {
+function doAdd(id, command) {
+	try {
+		allMaps.get(id).addChar(capitalCase(command[2]), new DaisyChar(command[1], command[3], true));
+	} catch (err) {
 		sendTemp(id, "Error. Please format as follows:\n\t--add [party/enemy/neutral/object] [name] [letter][number]")
 	}
 }
-function tryAddMany(id, command) {
-	try {doAddMany(id, command);} catch (err) {
+function doAddGroup(id, command) {
+	try {
+		const thisMap = allMaps.get(id);
+		const charName = capitalCase(command[2]);
+		command[3].split(",").forEach((coord, i) => {
+			thisMap.addChar(charName, new DaisyChar(command[1], coord, true));
+		});
+	} catch (err) {
 		sendTemp(id, "Error. Please format as follows:\n\t--addmany [name] [letter][number],[letter][number],...")
 	}
 }
-function tryAddArea(id, command) {
-	try {doAddArea(id, command);} catch (err) {
+function doAddArea(id, command) {
+	try {
+		allMaps.get(id).addArea(command[1], command[2]);
+	} catch (err) {
 		sendTemp(id, "Error. Please format as follows:\n\t--addarea [object/background/wall] [r4:ng3],[r4:ng3],...");
 	}
 }
-function tryMove(id, command) {
-	try {doMove(id, command);} catch (err) {
+function doMove(id, command) {
+	try {
+		allMaps.get(id).getChar(capitalCase(command[1])).moveTo(command[2]);
+	} catch (err) {
 		sendTemp(id, "Error. Please format as follows:\n\t--move [name] [letter][number]")
 	}
+}
+async function doMap(id) {
+	return sendTo(id, {
+		files: [new MessageAttachment(await allMaps.get(id).buildMap(), id + "_map.png")]
+	});
 }
 //--------------------------------------------------------------------MAIN
 bot.once("ready", () => {
@@ -108,9 +119,10 @@ bot.once("ready", () => {
 	//sendTemp(process.env.TEST_CHANNEL, process.env.TEST_COMMAND, 2*HELPTIMER);
 });
 
-bot.on("messageCreate", (message) => {
+bot.on("messageCreate", async (message) => {
 	if (!message.author.bot) {
 		let shouldDelete = false;
+		let shouldDisplay = false;
 		console.log(`#${message.author.discriminator} @${message.channel.id}`);
 
 		message.content.split("\n").forEach( async (messageLine, i) => {
@@ -123,25 +135,36 @@ bot.on("messageCreate", (message) => {
 					case "help": doHelp(message.channel.id, command); break; //an exception here should never occur
 					case "quit": doQuit(message.channel.id, command); break; //an exception here should never occur
 					case "ping": doPing(message.channel.id, command); break; //an exception here should never occur
+					case "clean": doClean(message.channel.id, command); break;
 					case "newmap":
-					case "new": tryNew(message.channel.id, command); break;
+					case "new": doNew(message.channel.id, command); break;
 					case "reveal":
-					case "hide": tryHide(message.channel.id, command); break;
+					case "hide": doHide(message.channel.id, command); break;
 					case "newtile":
-					case "add": tryAdd(message.channel.id, command); break;
+					case "add": doAdd(message.channel.id, command); break;
+					case "addmany":
 					case "newgroup":
-					case "newtiles":
-					case "addmany": tryAddMany(message.channel.id, command); break;
+					case "addgroup": doAddGroup(message.channel.id, command); break;
 					case "newarea":
-					case "addarea": tryAddArea(message.channel.id, command); break;
-					case "move": tryMove(message.channel.id, command); break;
+					case "addarea": doAddArea(message.channel.id, command); break;
+					case "move": doMove(message.channel.id, command); break;
 					case "display":
-					case "map": await doMap(message.channel.id, command); break; //an exception here shows a fatal error.
+					case "map":
+						if (allDisplays.get(message.channel.id) !== undefined) {
+							bot.channels.cache.get(message.channel.id).messages.fetch(allDisplays.get(message.channel.id)).then((msg) => {
+								msg.delete();
+							});
+						}
+						await doMap(message.channel.id, command).then((msg) => {
+							allDisplays.set(message.channel.id, msg.id);
+						});
+						break;
 
 					default: sendTo(message.channel.id, messageLine.slice(PREFIX.length));
 				}
 			}
 		});
+		if (shouldDisplay) {doMap(id);}
 		if (shouldDelete) {message.delete();}
 	}
 });

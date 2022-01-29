@@ -56,10 +56,10 @@ class DaisyMap {
 		this.pM = Math.ceil(this.pS/64);
 		this.chars = new Map();
 
-		if (_bg === undefined) {_bg = "A1:"+_dims;}
+		if (_bg === undefined || _bg === null) {_bg = "A1:"+_dims;}
 		this.bg = parseRangeCoords(_bg);
-		this.obj = (_obj === undefined) ? [] : parseRangeCoords(_obj);
-		this.wall = (_wall === undefined) ? [] : parseRangeCoords(_wall);
+		this.obj = (_obj === undefined || _obj === null) ? [] : parseRangeCoords(_obj);
+		this.wall = (_wall === undefined || _wall === null) ? [] : parseRangeCoords(_wall);
 
 		this.canvas = createCanvas((1+this.dims[0])*this.pS, (1+this.dims[1])*this.pS);
 		this.context = this.canvas.getContext("2d");
@@ -75,9 +75,10 @@ class DaisyMap {
 			char.pos[1] >= 0 && char.pos[1] <= this.dims[1] ) {this.addChar(charName, char);}
 		else {throw `Char ${charName} not on map!`;}
 	}
-	getChar(charName) {
-		if (this.chars.get(charName) === undefined) {throw `Char ${CharName} not registered!`;}
-		return this.chars.get(charName)[0];
+	getChar(charCode) {
+		const charTup = charCode.split("_");
+		if (this.chars.get(charTup[0]) === undefined) {throw `Char ${CharCode} not registered!`;}
+		return this.chars.get(charTup[0])[parseInt((charTup.length == 1) ? 0 : parseInt(charTup[1],10)-1)];
 	}
 	addArea(type, rangeCoords) {
 		let areaHolder;
