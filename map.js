@@ -3,23 +3,23 @@ const { createCanvas, loadImage } = require('canvas')
 
 //--------------------------------------------------------------------CONSTANTS
 const TEAM = new Map([
-	["b", "#a38b53"],
-	["o", "#848b94"],
-	["w", "#000"],
-	["e", "#f33"],
-	["p", "#3f3"],
-	["a", "#38f"],
-	["n", "#640"]
+	["p", ["#3f3", "Party"]],
+	["a", ["#38f", "Allies"]],
+	["e", ["#f33", "Enemies"]],
+	["n", ["#640", "Neutrals"]],
+	["o", ["#848b94", "Objects"]],
+	["b", ["#a38b53", "Background"]],
+	["w", ["#000", "Walls"]]
 ]);
 
 const MAX_PH = 1080, MAX_PV = 800;
 //--------------------------------------------------------------------HELPERS
-function parseCoords(coord) {
-	return [parseInt(coord.slice(1),10), coord.charCodeAt(0)-64];
-}
 function lesserOf(a, b) {
 	if (b<a) {return b;}
 	return a;
+}
+function parseCoords(coord) {
+	return [parseInt(coord.slice(1),10), coord.charCodeAt(0)-64];
 }
 function parseRangeCoords(rangeCoords) {
 	if (rangeCoords === undefined) {rangeCoords = "A1:"+_dims;}
@@ -36,12 +36,25 @@ function parseRangeCoords(rangeCoords) {
 //--------------------------------------------------------------------MAIN
 //------------------------------------CHAR
 class DaisyChar {
-	constructor(_team, _pos, _visible = false) {
-		this.team = TEAM.get(_team[0].toLowerCase());
-		if (this.team === undefined) {throw `Team ${_team} not valid!`;}
+	static getCharTup(charStr) {
+		return charStr.split("_");
+	}
+	static makeCharCode(charName) {
+		return charName[0] + charName[charName.length-1];
+	}
+	static getColour(teamChar) {
+		return TEAM.get(teamChar)[0];
+	}
 
+	constructor(_team, _pos, _visible = false) {
+		this.team = (_team[0] == "#") ? _team : DaisyChar.getColour(_team[0].toLowerCase())
 		this.pos = parseCoords(_pos);
 		this.visible = _visible;
+		this.removed = false;
+	}
+
+	copy(_pos) {
+		return new DaisyChar(this.team, _pos, this.visible);
 	}
 
 	moveTo(_pos) {
@@ -63,6 +76,8 @@ class DaisyMap {
 
 		this.canvas = createCanvas((1+this.dims[0])*this.pS, (1+this.dims[1])*this.pS);
 		this.context = this.canvas.getContext("2d");
+
+		this.map = false;
 	}
 
 	addChar(charName, char) {
@@ -70,15 +85,16 @@ class DaisyMap {
 		if (ls !== undefined) {ls.push(char);}
 		else {this.chars.set(charName, [char]);}
 	}
-	addCharCheck(charName, char) {
-		if (char.pos[0] >= 0 && char.pos[0] <= this.dims[0] &&
-			char.pos[1] >= 0 && char.pos[1] <= this.dims[1] ) {this.addChar(charName, char);}
-		else {throw `Char ${charName} not on map!`;}
-	}
-	getChar(charCode) {
-		const charTup = charCode.split("_");
-		if (this.chars.get(charTup[0]) === undefined) {throw `Char ${CharCode} not registered!`;}
+	getChar(charStr) {
+		const charTup = DaisyChar.getCharTup(charStr);
+		if (this.chars.get(charTup[0]) === undefined) {throw `Char ${charTup[0]} not registered!`;}
 		return this.chars.get(charTup[0])[parseInt((charTup.length == 1) ? 0 : parseInt(charTup[1],10)-1)];
+	}
+	getCharLs(charStr) {
+		return this.chars.get(DaisyChar.getCharTup(charStr)[0]);
+	}
+	removeCharLs(charStr) {
+		this.chars.delete(DaisyChar.getCharTup(charStr)[0]);
 	}
 	addArea(type, rangeCoords) {
 		let areaHolder;
@@ -118,11 +134,11 @@ class DaisyMap {
 		this.context.textBaseline = "middle";
 		this.context.font = (this.pS/2-3*this.pM).toString()+"px Arial";
 
-		this.context.fillStyle = TEAM.get("b");
+		this.context.fillStyle = DaisyChar.getColour("b");
 		this.fillArea(this.bg);
-		this.context.fillStyle = TEAM.get("o");
+		this.context.fillStyle = DaisyChar.getColour("o");
 		this.fillArea(this.obj);
-		this.context.fillStyle = TEAM.get("w");
+		this.context.fillStyle = DaisyChar.getColour("w");
 		this.fillArea(this.wall);
 
 		this.context.fillStyle = "#fff";
@@ -134,11 +150,11 @@ class DaisyMap {
 		this.prepMap();
 
 		for (const [charName, charLs] of this.chars.entries()) {
-			let charCode = charName[0] + charName[charName.length-1];
+			let charCode = DaisyChar.makeCharCode(charName);
 			let many = (charLs.length > 1);
 
 			charLs.forEach((char, i) => {
-				if (char.visible) {
+				if (char.visible && !char.removed) {
 					this.context.fillStyle = char.team;
 					this.fillCell(char.pos[0], char.pos[1]);
 					this.context.fillStyle = "#000";
@@ -152,6 +168,7 @@ class DaisyMap {
 }
 //--------------------------------------------------------------------FINALIZE
 export {
+	TEAM,
 	DaisyMap,
 	DaisyChar
 }
