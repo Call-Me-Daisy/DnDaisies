@@ -23,52 +23,55 @@ const PREFIX = "--";
 function capitalCase(str) {
 	return str[0].toUpperCase() + str.slice(1).toLowerCase();
 }
-function sendTo(id, message) {
-	return bot.channels.cache.get(id).send(message);
-}
-function sendTemp(id, message, duration = HELPTIMER) {
-	sendTo(id, message).then(msg => {
-		setTimeout(() => msg.delete(), duration);
-	});
-}
 function deleteFrom(id, msgId) {
 	bot.channels.cache.get(id).messages.fetch(msgId).then((msg) => {
 		msg.delete();
 	}).catch((error) => {});
 }
+
+function getMap(links) {
+	return allMaps.get(links.c.id);
+}
+function sendTo(links, content) {
+	return links.c.send(content);
+}
+function sendTemp(links, content, duration = HELPTIMER) {
+	sendTo(links, content).then((message) => {
+		setTimeout(() => message.delete(), HELPTIMER);
+	});
+}
 //--------------------------------------------------------------------DECLUTTERING
-function doQuit(id, command) {
+function doQuit() {
 	allMaps.forEach((dMap, id) => {
 		deleteFrom(id, dMap.map);
 	});
 
 	setTimeout(function() {bot.destroy();}, HELPTIMER*1.5);
 }
-function doClean(id, command) {
+function doClean(links) {
 	//TO-DO
 }
-
-function doHelp(id, command) {
+function doHelp(links, command) {
+	sendTemp(links, helpSwitch(PREFIX, command));
 	try {
-		sendTemp(id, helpSwitch(PREFIX, command), HELPTIMER);
 	} catch (err) {
-		doHelp(id, [""]);
+		doHelp(links, [""]);
 	}
 }
-function doPing(id, command) {
+function doPing(links) {
+	sendTo(links, `pong\t(${Date.now()-links.m.createdTimestamp} ms)`);
 	try {
-		sendTo(id, "pong\t(" + (Date.now()-message.createdTimestamp).toString() + "ms)");
 	} catch (err) {
-		doHelp(id, ["","ping"]);
+		doHelp(links, ["","ping"]);
 	}
 }
-function doList(id, command) {
-	try {let msgMap = new Map();
+function doList(links, command) {
+	try {
+		let msgMap = new Map();
 		TEAM.forEach((teamTup, key) => {
 			msgMap.set(teamTup[0], [`__Team: ${teamTup[1]}__`]);
 		});
-
-		allMaps.get(id).chars.forEach((char, key) => {
+		getMap(links).chars.forEach((char, key) => {
 			msgMap.get(char[0].team).push(`Token: ${DaisyChar.makeCharCode(key)} => Name: ${key}`);
 		});
 
@@ -78,55 +81,53 @@ function doList(id, command) {
 				if (ls.length > 1) {msg.push(ls.join("\n"));}
 			});
 		}
-		else {
-			msg.push(msgMap.get(TEAM.get(command[1][0].toLowerCase())[0]).join("\n"));
-		}
-		sendTemp(id, msg.join("\n"));
+		else {msg.push(msgMap.get(TEAM.get(command[1][0].toLowerCase())[0]).join("\n"));}
+		sendTemp(links, msg.join("\n"));
 	} catch (err) {
-		doHelp(id, ["","list"]);
+		doHelp(links, ["","list"]);
 	}
 }
-function doNew(id, command) {
+function doNew(links, command) {
 	try {
-		const mapId = (allMaps.get(id) === undefined) ? false : allMaps.get(id).map;
+		const mapId = (getMap(links) === undefined) ? false : getMap(links).map;
 		while(command.length < 5) {command.push(undefined);}
-		allMaps.set(id, new DaisyMap(command[1], command[2], command[3], command[4]));
-		allMaps.get(id).map = mapId;
+		allMaps.set(links.c.id, new DaisyMap(command[1], command[2], command[3], command[4]));
+		allMaps.get(links.c.id).map = mapId;
 	} catch (err) {
-		doHelp(id, ["","new"]);
+		doHelp(links, ["","new"]);
 	}
 }
-function doHide(id, command) {
+function doHide(links, command) {
 	try {
-		const char = allMaps.get(id).getChar(command[1])
+		const char = getMap(links).getChar(command[1])
 		char.visible = !char.visible;
 	} catch (err) {
-		doHelp(id, ["hide"]);
+		doHelp(links, ["hide"]);
 	}
 }
-function doAdd(id, command) {
+function doAdd(links, command) {
 	try {
-		allMaps.get(id).addChar(capitalCase(command[2]), new DaisyChar(command[1], command[3], true));
+		getMap(links).addChar(capitalCase(command[2]), new DaisyChar(command[1], command[3], true));
 	} catch (err) {
-		doHelp(id, ["","add"]);
+		doHelp(links, ["","add"]);
 	}
 }
-function doCopy(id, command) {
+function doCopy(links, command) {
 	try {
 		let charStr = capitalCase(command[1]);
-		const thisMap = allMaps.get(id);
+		const thisMap = getMap(links);
 		const parent = thisMap.getChar(charStr);
 		charStr = DaisyChar.getCharTup(charStr)[0];
 		command[2].split(",").forEach((coord, i) => {
 			thisMap.addChar(charStr, parent.copy(coord));
 		});
 	} catch (err) {
-		doHelp(id, ["","copy"]);
+		doHelp(links, ["","copy"]);
 	}
 }
-function doRemove(id, command) {
+function doRemove(links, command) {
 	try {
-		const thisMap = allMaps.get(id);
+		const thisMap = getMap(links);
 		const charStr = capitalCase(command[1]);
 
 		let allRemoved = true;
@@ -137,37 +138,37 @@ function doRemove(id, command) {
 		});
 		if (allRemoved) {thisMap.removeCharLs(charStr);}
 	} catch (err) {
-		doHelp(id, ["","remove"]);
+		doHelp(links, ["","remove"]);
 	}
 }
-function doAddGroup(id, command) {
+function doAddGroup(links, command) {
 	try {
-		const thisMap = allMaps.get(id);
+		const thisMap = getMap(links);
 		const charName = capitalCase(command[2]);
 		command[3].split(",").forEach((coord, i) => {
 			thisMap.addChar(charName, new DaisyChar(command[1], coord, true));
 		});
 	} catch (err) {
-		doHelp(id, ["","addgroup"]);
+		doHelp(links.c.id, ["","addgroup"]);
 	}
 }
-function doAddArea(id, command) {
+function doAddArea(links, command) {
 	try {
-		allMaps.get(id).addArea(command[1], command[2]);
+		getMap(links).addArea(command[1], command[2]);
 	} catch (err) {
-		doHelp(id, ["","addarea"]);
+		doHelp(links, ["","addarea"]);
 	}
 }
-function doMove(id, command) {
+function doMove(links, command) {
 	try {
-		allMaps.get(id).getChar(capitalCase(command[1])).moveTo(command[2]);
+		getMap(links).getChar(capitalCase(command[1])).moveTo(command[2]);
 	} catch (err) {
-		doHelp(id, ["","move"]);
+		doHelp(links, ["","move"]);
 	}
 }
-function doMoveGroup(id, command) {
+function doMoveGroup(links, command) {
 	try {
-		const charLs = allMaps.get(id).getCharLs(capitalCase(command[1]));
+		const charLs = getMap(links).getCharLs(capitalCase(command[1]));
 		let numRemoved = 0;
 		command[2].split(",").forEach((coord, i) => {
 			while (i+numRemoved < charLs.length && charLs[i+numRemoved].removed) {numRemoved++;}
@@ -175,80 +176,81 @@ function doMoveGroup(id, command) {
 			charLs[i+numRemoved].moveTo(coord);
 		});
 	} catch (err) {
-		doHelp(id, ["","movegroup"]);
+		doHelp(links, ["","movegroup"]);
 	}
 }
-async function doMap(id) {
+async function doMap(links) {
 	try {
-		if (allMaps.get(id).map) {
-			deleteFrom(id, allMaps.get(id).map);
+		if (getMap(links).map) {
+			deleteFrom(links.c.id, getMap(links).map);
 		}
-		sendTo(id, {
-			files: [new MessageAttachment(await allMaps.get(id).buildMap(), id + "_map.png")]
+		sendTo(links, {
+			files: [new MessageAttachment(await getMap(links).buildMap(), links.c.id + "_map.png")]
 		}).then((msg) => {
-			allMaps.get(id).map = msg.id;
+			getMap(links).map = msg.id;
 		});
 	} catch (err) {
-		doHelp(id, ["","map"]);
+		doHelp(links.c.id, ["","map"]);
 	}
 }
 //--------------------------------------------------------------------MAIN
-function mainSwitch(id, messageStr) {
-	let shouldDelete = false;
-	messageStr.split("\n").forEach( async (messageLine, i) => {
-		if (messageLine.startsWith(PREFIX)) {
-			shouldDelete = true;
-			console.log(messageLine);
-			const command = messageLine.slice(PREFIX.length).split(" ");
+function mainSwitch(links, command) {
+	if (command[0].startsWith(PREFIX)) {
+		console.log(command);
 
-			switch (command[0].toLowerCase()) {
-				case "quit": doQuit(id); break;
-				case "clean": doClean(id); break;
-				case "help": doHelp(id, command); break;
-				case "ping": doPing(id, command); break;
-				case "tokens":
-				case "list": doList(id, command); break;
-				case "newmap":
-				case "new": doNew(id, command); break;
-				case "reveal":
-				case "hide": doHide(id, command); break;
-				case "newtoken":
-				case "add": doAdd(id, command); break;
-				case "reinforce":
-				case "duplicate":
-				case "copy": doCopy(id, command); break;
-				case "kill":
-				case "delete":
-				case "remove": doRemove(id, command); break;
-				case "newgroup":
-				case "addmany":
-				case "addgroup": doAddGroup(id, command); break;
-				case "newarea":
-				case "addarea": doAddArea(id, command); break;
-				case "movetoken":
-				case "move": doMove(id, command); break;
-				case "movetokens":
-				case "movegroup": doMoveGroup(id, command); break;
-				case "display":
-				case "map": doMap(id); break;
+		switch (command[0].slice(PREFIX.length).toLowerCase()) {
+			case "quit": doQuit(); break;
+			case "clean": doClean(links); break;
+			case "ping": doPing(links); break;
+			case "help": doHelp(links, command); break;
+			case "tokens":
+			case "list": doList(links, command); break;
+			case "newmap":
+			case "new": doNew(links, command); break;
+			case "reveal":
+			case "hide": doHide(links, command); break;
+			case "newtoken":
+			case "add": doAdd(links, command); break;
+			case "reinforce":
+			case "duplicate":
+			case "copy": doCopy(links, command); break;
+			case "kill":
+			case "delete":
+			case "remove": doRemove(links, command); break;
+			case "newgroup":
+			case "addmany":
+			case "addgroup": doAddGroup(links, command); break;
+			case "newarea":
+			case "addarea": doAddArea(links, command); break;
+			case "movetoken":
+			case "move": doMove(links, command); break;
+			case "movetokens":
+			case "movegroup": doMoveGroup(links, command); break;
+			case "display":
+			case "map": doMap(links); break;
 
-				default: sendTemp(id, `Unknown command:\n${messageLine.slice}`);
-			}
+			default: sendTemp(links, `Unknown command:\n${command.join(" ")}`);
 		}
-	});
-	return shouldDelete;
+		return undefined;
+	}
+	return false;
 }
 
 bot.once("ready", () => {
 	console.log(`Logged in as ${bot.user.tag}`);
-	//sendTemp(process.env.TEST_CHANNEL, process.env.TEST_COMMAND, 2*HELPTIMER);
 });
 
 bot.on("messageCreate", async (message) => {
 	if (!message.author.bot) {
 		console.log(`#${message.author.discriminator} @${message.channel.id}`);
 
-		if (mainSwitch(message.channel.id, message.content)) {message.delete();}
+		let shouldDelete = undefined;
+		const links = {g: message.channel.guild, c: message.channel, m: message};
+		message.content.split("\n").forEach( async (messageLine, i) => {
+			let temp = mainSwitch(links, messageLine.split(" "));
+			if (temp !== undefined && shouldDelete != !temp) {shouldDelete = temp;}
+		});
+		if (shouldDelete != false) {message.delete();}
 	}
 });
 //--------------------------------------------------------------------FINALIZE
