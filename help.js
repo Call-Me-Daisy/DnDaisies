@@ -126,7 +126,7 @@ Move multiple tokens in a group to new co-ordinates
 }
 function helpMap(prefix) {
 	return `
-Display this channel's map (created with *prior** calls to the other functions).
+Display this channel's map (created with *prior* calls to the other functions).
 **Aliases** ${prefix}map ${prefix}display
 **No Arguments**
 	`;
