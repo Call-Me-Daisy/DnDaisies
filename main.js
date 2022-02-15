@@ -98,7 +98,7 @@ function doQuit() {
 	setTimeout(function() {bot.destroy();}, HELPTIMER*1.5);
 }
 function doClean(links) {
-	deleteMapMsg(getMap(links));
+	clearMap(getMap(links));
 }
 function doHelp(links, command) {
 	try {
