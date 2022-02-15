@@ -1,6 +1,6 @@
 require("dotenv").config();
 
-const {Client, Intents, MessageAttachment} = require("discord.js");
+const {Client, Intents, MessageAttachment, TextChannel} = require("discord.js");
 const {createCanvas, loadImage} = require ("canvas");
 const {TEAM, DaisyMap, DaisyChar} = require("./map");
 const {helpSwitch} = require("./help");
@@ -23,8 +23,12 @@ const PREFIX = "--";
 function capitalCase(str) {
 	return str[0].toUpperCase() + str.slice(1).toLowerCase();
 }
-function deleteFrom(id, msgId) {
-	bot.channels.cache.get(id).messages.fetch(msgId).then((msg) => {
+
+function fetchMessage(idC, idM) {
+		return bot.channels.cache.get(idC).messages.fetch(idM);
+}
+function deleteFrom(idC, idM) {
+	fetchMessage(idC,idM).then((msg) => {
 		msg.delete();
 	}).catch((error) => {});
 }
@@ -35,32 +39,77 @@ function getMap(links) {
 function sendTo(links, content) {
 	return links.c.send(content);
 }
-function sendTemp(links, content, duration = HELPTIMER) {
-	sendTo(links, content).then((message) => {
-		setTimeout(() => message.delete(), HELPTIMER);
+function makeTemp(message, duration = HELPTIMER) {
+	message.then((msg) => {
+		setTimeout(() => msg.delete(), duration);
 	});
 }
+
+function clearImg(dMap) {
+	if (dMap.img) {
+		deleteFrom(dMap.img.parentId, dMap.img.id);
+		dMap.img.delete().catch((error) => {});
+	}
+}
+function clearMap(dMap) {
+	if (dMap.map) {dMap.map.delete().catch((error) => {});}
+}
 //--------------------------------------------------------------------DECLUTTERING
+function doLog(links, command) {
+	if (command.size !== 1) {
+		switch (command[1][0].toLowerCase()) {
+			case "m": console.log(links.m); break;
+			case "c": console.log(links.c); break;
+			case "g": console.log(links.g); break;
+		}
+	}
+	else if (links.m.reference !== null) {
+		fetchMessage(links.m.reference.channelId, links.m.reference.messageId).then((msg) => {console.log(msg)});
+	}
+}
+function doImage(links) {
+	if (!(links.c instanceof TextChannel)) {doHelp(links, ["","image"]);}
+	else {
+		if (getMap(links) === undefined) {doNew(links,["","A1"]);}
+		let dMap = getMap(links);
+		if (!dMap.img) {
+			sendTo(links, process.env.THREADPROMPT).then((message) => {
+				message.startThread({
+					name: process.env.THREADNAME,
+					autoArchiveDuration: 60
+				}).then((thread) => {dMap.img = thread});
+			});
+		}
+		else {
+			dMap.img.setArchived(false);
+			fetchMessage(links.c.id, dMap.img.id).then((msg) => {
+				makeTemp(msg.reply("bump"));
+			});
+		}
+	}
+}
+
 function doQuit() {
 	allMaps.forEach((dMap, id) => {
-		deleteFrom(id, dMap.map);
+		clearMap(dMap);
+		clearImg(dMap);
 	});
 
 	setTimeout(function() {bot.destroy();}, HELPTIMER*1.5);
 }
 function doClean(links) {
-	//TO-DO
+	deleteMapMsg(getMap(links));
 }
 function doHelp(links, command) {
-	sendTemp(links, helpSwitch(PREFIX, command));
 	try {
+		makeTemp(sendTo(links, helpSwitch(PREFIX, command)));
 	} catch (err) {
 		doHelp(links, [""]);
 	}
 }
 function doPing(links) {
-	sendTo(links, `pong\t(${Date.now()-links.m.createdTimestamp} ms)`);
 	try {
+		sendTo(links, `pong\t(${Date.now()-links.m.createdTimestamp} ms)`);
 	} catch (err) {
 		doHelp(links, ["","ping"]);
 	}
@@ -82,17 +131,16 @@ function doList(links, command) {
 			});
 		}
 		else {msg.push(msgMap.get(TEAM.get(command[1][0].toLowerCase())[0]).join("\n"));}
-		sendTemp(links, msg.join("\n"));
+		makeTemp(sendTo(links, msg.join("\n")));
 	} catch (err) {
 		doHelp(links, ["","list"]);
 	}
 }
 function doNew(links, command) {
 	try {
-		const mapId = (getMap(links) === undefined) ? false : getMap(links).map;
+		const [map, img] = DaisyMap.recover(getMap(links));
 		while(command.length < 5) {command.push(undefined);}
-		allMaps.set(links.c.id, new DaisyMap(command[1], command[2], command[3], command[4]));
-		allMaps.get(links.c.id).map = mapId;
+		allMaps.set(links.c.id, new DaisyMap(command[1], command[2], command[3], command[4], map, img));
 	} catch (err) {
 		doHelp(links, ["","new"]);
 	}
@@ -181,24 +229,24 @@ function doMoveGroup(links, command) {
 }
 async function doMap(links) {
 	try {
-		if (getMap(links).map) {
-			deleteFrom(links.c.id, getMap(links).map);
-		}
+		if (getMap(links).map) {doClean(links);}
 		sendTo(links, {
 			files: [new MessageAttachment(await getMap(links).buildMap(), links.c.id + "_map.png")]
 		}).then((msg) => {
-			getMap(links).map = msg.id;
+			getMap(links).map = msg;
 		});
 	} catch (err) {
-		doHelp(links.c.id, ["","map"]);
+		doHelp(links, ["","map"]);
 	}
 }
 //--------------------------------------------------------------------MAIN
 function mainSwitch(links, command) {
 	if (command[0].startsWith(PREFIX)) {
 		console.log(command);
-
 		switch (command[0].slice(PREFIX.length).toLowerCase()) {
+			case "log": doLog(links, command); break;
+			case "image": doImage(links); break;
+
 			case "quit": doQuit(); break;
 			case "clean": doClean(links); break;
 			case "ping": doPing(links); break;
@@ -229,7 +277,7 @@ function mainSwitch(links, command) {
 			case "display":
 			case "map": doMap(links); break;
 
-			default: sendTemp(links, `Unknown command:\n${command.join(" ")}`);
+			default: makeTemp(sendTo(links, `Unknown command:\n${command.join(" ")}`));
 		}
 		return undefined;
 	}
@@ -240,13 +288,13 @@ bot.once("ready", () => {
 	console.log(`Logged in as ${bot.user.tag}`);
 });
 
-bot.on("messageCreate", async (message) => {
+bot.on("messageCreate", (message) => {
 	if (!message.author.bot) {
 		console.log(`#${message.author.discriminator} @${message.channel.id}`);
 
 		let shouldDelete = undefined;
 		const links = {g: message.channel.guild, c: message.channel, m: message};
-		message.content.split("\n").forEach( async (messageLine, i) => {
+		message.content.split("\n").forEach((messageLine, i) => {
 			let temp = mainSwitch(links, messageLine.split(" "));
 			if (temp !== undefined && shouldDelete != !temp) {shouldDelete = temp;}
 		});
