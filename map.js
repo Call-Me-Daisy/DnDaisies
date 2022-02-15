@@ -63,7 +63,11 @@ class DaisyChar {
 }
 //------------------------------------MAP
 class DaisyMap {
-	constructor(_dims, _bg, _obj, _wall, _pH = MAX_PH, _pV = MAX_PV) {
+	static recover(dMap) {
+		return (dMap === undefined) ? [false, false] : [dMap.map, dMap.img];
+	}
+
+	constructor(_dims, _bg, _obj, _wall, _map, _img, _pH = MAX_PH, _pV = MAX_PV) {
 		this.dims = parseCoords(_dims);
 		this.pS = lesserOf(Math.floor(_pH/this.dims[0]), Math.floor(_pV/this.dims[1]));
 		this.pM = Math.ceil(this.pS/64);
@@ -77,7 +81,8 @@ class DaisyMap {
 		this.canvas = createCanvas((1+this.dims[0])*this.pS, (1+this.dims[1])*this.pS);
 		this.context = this.canvas.getContext("2d");
 
-		this.map = false;
+		this.map = _map;
+		this.img = _img;
 	}
 
 	addChar(charName, char) {
