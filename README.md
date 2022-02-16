@@ -1,14 +1,14 @@
 # DnDaisies
 Discord bot for making a DnD map within a channel.
 
-Currently supports:
-  General:
-    - Help command to explain (hopefully?) everything else (Standard = --help)
-    - Self-deleting messages where appropriate
-    - Instruction lists (many commands in one message, separated by newline)
-  DnD:
-    - Completely independant maps across channels
-    - Map printing with colour-coded ally/enemy tokens and pained background/object/walls
+Currently supports (General):
+  - Help command to explain (hopefully?) everything else (Standard = --help)
+  - Self-deleting messages where appropriate
+  - Instruction lists (many commands in one message, separated by newline)
+
+Currently supports (DnD):
+  - Completely independant maps across channels
+  - Map printing with colour-coded ally/enemy tokens and pained background/object/walls
 
 Currently in progress:
   - Optionally replace coloured tokens with character images
