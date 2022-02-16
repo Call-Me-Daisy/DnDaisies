@@ -23,9 +23,23 @@ const PREFIX = "--";
 function capitalCase(str) {
 	return str[0].toUpperCase() + str.slice(1).toLowerCase();
 }
+function codeCase(str) {
+	let out = str.split(" ");
+	out.forEach((word, i) => {
+		word = capitalCase(word);
+	});
+	return out.join("_");
+}
+
+function getMap(links) {
+	return allMaps.get(links.c.id);
+}
 
 function fetchMessage(idC, idM) {
-		return bot.channels.cache.get(idC).messages.fetch(idM);
+	return bot.channels.cache.get(idC).messages.fetch(idM);
+}
+function fetchReference(refs) {
+	return fetchMessage(refs.channelId, refs.messageId);
 }
 function deleteFrom(idC, idM) {
 	fetchMessage(idC,idM).then((msg) => {
@@ -33,9 +47,6 @@ function deleteFrom(idC, idM) {
 	}).catch((error) => {});
 }
 
-function getMap(links) {
-	return allMaps.get(links.c.id);
-}
 function sendTo(links, content) {
 	return links.c.send(content);
 }
@@ -55,7 +66,15 @@ function clearMap(dMap) {
 	if (dMap.map) {dMap.map.delete().catch((error) => {});}
 }
 //--------------------------------------------------------------------DECLUTTERING
-function doLog(links, command) {
+function doQuit() {//TEMP: For cleaning between updates
+	allMaps.forEach((dMap, id) => {
+		clearMap(dMap);
+		clearImg(dMap);
+	});
+
+	setTimeout(function() {bot.destroy();}, HELPTIMER*1.5);
+}
+function doLog(links, command) {//TEMP: Debug helper
 	if (command.size !== 1) {
 		switch (command[1][0].toLowerCase()) {
 			case "m": console.log(links.m); break;
@@ -64,54 +83,14 @@ function doLog(links, command) {
 		}
 	}
 	else if (links.m.reference !== null) {
-		fetchMessage(links.m.reference.channelId, links.m.reference.messageId).then((msg) => {console.log(msg)});
+		fetchReference(links.m.reference).then((msg) => {console.log(msg)});
 	}
-}
-function doImage(links) {
-	if (!(links.c instanceof TextChannel)) {doHelp(links, ["","image"]);}
-	else {
-		if (getMap(links) === undefined) {doNew(links,["","A1"]);}
-		let dMap = getMap(links);
-		if (!dMap.img) {
-			sendTo(links, process.env.THREADPROMPT).then((message) => {
-				message.startThread({
-					name: process.env.THREADNAME,
-					autoArchiveDuration: 60
-				}).then((thread) => {dMap.img = thread});
-			});
-		}
-		else {
-			dMap.img.setArchived(false);
-			fetchMessage(links.c.id, dMap.img.id).then((msg) => {
-				makeTemp(msg.reply("bump"));
-			});
-		}
-	}
-}
-
-function doQuit() {
-	allMaps.forEach((dMap, id) => {
-		clearMap(dMap);
-		clearImg(dMap);
-	});
-
-	setTimeout(function() {bot.destroy();}, HELPTIMER*1.5);
-}
-function doClean(links) {
-	clearMap(getMap(links));
 }
 function doHelp(links, command) {
 	try {
 		makeTemp(sendTo(links, helpSwitch(PREFIX, command)));
 	} catch (err) {
 		doHelp(links, [""]);
-	}
-}
-function doPing(links) {
-	try {
-		sendTo(links, `pong\t(${Date.now()-links.m.createdTimestamp} ms)`);
-	} catch (err) {
-		doHelp(links, ["","ping"]);
 	}
 }
 function doList(links, command) {
@@ -227,9 +206,60 @@ function doMoveGroup(links, command) {
 		doHelp(links, ["","movegroup"]);
 	}
 }
+function doPing(links) {
+	try {
+		sendTo(links, `pong\t(${Date.now()-links.m.createdTimestamp} ms)`);
+	} catch (err) {
+		doHelp(links, ["","ping"]);
+	}
+}
+function doImage(links) {
+	try {
+		if (!(links.c instanceof TextChannel)) {doHelp(links, ["","image"]);}
+		else {
+			if (getMap(links) === undefined) {doNew(links,["","A1"]);}
+			let dMap = getMap(links);
+			if (!dMap.img) {
+				sendTo(links, process.env.THREADPROMPT).then((message) => {
+					message.startThread({
+						name: process.env.THREADNAME,
+						autoArchiveDuration: 60
+					}).then((thread) => {
+						dMap.img = thread
+						if (links.m.reference !== null) {//TEMP: Quick reset after quit
+							fetchReference(links.m.reference).then((msg) => {
+								if (!msg.hasThread) {return;}
+								bot.channels.cache.get(msg.id).messages.fetch({limit:100}).then((messages) => {
+									messages.forEach((msg, i) => {
+										if (msg.attachments.size > 0) {
+											let entries = [];
+											msg.attachments.forEach((attachment, j) => {entries.push(attachment)});
+											thread.send({
+												content: codeCase(msg.content),
+												files: entries
+											});
+										}
+									});
+								});
+							});
+						}
+					});
+				});
+			}
+			else {
+				dMap.img.setArchived(false);
+				fetchMessage(links.c.id, dMap.img.id).then((msg) => {
+					makeTemp(msg.reply("bump"));
+				});
+			}
+		}
+	} catch (e) {
+		doHelp(links, ["","image"]);
+	}
+}
 async function doMap(links) {
 	try {
-		if (getMap(links).map) {doClean(links);}
+		if (getMap(links).map) {clearMap(getMap(links));;}
 		sendTo(links, {
 			files: [new MessageAttachment(await getMap(links).buildMap(), links.c.id + "_map.png")]
 		}).then((msg) => {
@@ -239,17 +269,15 @@ async function doMap(links) {
 		doHelp(links, ["","map"]);
 	}
 }
+//--------------------------------------------------------------------TESTING
+
 //--------------------------------------------------------------------MAIN
 function mainSwitch(links, command) {
 	if (command[0].startsWith(PREFIX)) {
 		console.log(command);
 		switch (command[0].slice(PREFIX.length).toLowerCase()) {
-			case "log": doLog(links, command); break;
-			case "image": doImage(links); break;
-
 			case "quit": doQuit(); break;
-			case "clean": doClean(links); break;
-			case "ping": doPing(links); break;
+			case "log": doLog(links, command); break;
 			case "help": doHelp(links, command); break;
 			case "tokens":
 			case "list": doList(links, command); break;
@@ -274,6 +302,8 @@ function mainSwitch(links, command) {
 			case "move": doMove(links, command); break;
 			case "movetokens":
 			case "movegroup": doMoveGroup(links, command); break;
+			case "ping": doPing(links); break;
+			case "image": doImage(links); break;
 			case "display":
 			case "map": doMap(links); break;
 
