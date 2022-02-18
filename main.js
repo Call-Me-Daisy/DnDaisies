@@ -20,18 +20,7 @@ const HELPTIMER = 5000;
 const PREFIX = "--";
 
 //--------------------------------------------------------------------HELPERS
-function capitalCase(str) {
-	return str[0].toUpperCase() + str.slice(1).toLowerCase();
-}
-function codeCase(str) {
-	let out = str.split(" ");
-	out.forEach((word, i) => {
-		word = capitalCase(word);
-	});
-	return out.join("_");
-}
-
-function getMap(links) {
+function fetchMap(links) {
 	return allMaps.get(links.c.id);
 }
 
@@ -99,7 +88,7 @@ function doList(links, command) {
 		TEAM.forEach((teamTup, key) => {
 			msgMap.set(teamTup[0], [`__Team: ${teamTup[1]}__`]);
 		});
-		getMap(links).chars.forEach((char, key) => {
+		fetchMap(links).chars.forEach((char, key) => {
 			msgMap.get(char[0].team).push(`Token: ${DaisyChar.makeCharCode(key)} => Name: ${key}`);
 		});
 
@@ -117,7 +106,7 @@ function doList(links, command) {
 }
 function doNew(links, command) {
 	try {
-		const [map, img] = DaisyMap.recover(getMap(links));
+		const [map, img] = DaisyMap.recover(fetchMap(links));
 		while(command.length < 5) {command.push(undefined);}
 		allMaps.set(links.c.id, new DaisyMap(command[1], command[2], command[3], command[4], map, img));
 	} catch (err) {
@@ -126,7 +115,7 @@ function doNew(links, command) {
 }
 function doHide(links, command) {
 	try {
-		const char = getMap(links).getChar(command[1])
+		const char = fetchMap(links).getChar(command[1])
 		char.visible = !char.visible;
 	} catch (err) {
 		doHelp(links, ["hide"]);
@@ -134,15 +123,15 @@ function doHide(links, command) {
 }
 function doAdd(links, command) {
 	try {
-		getMap(links).addChar(capitalCase(command[2]), new DaisyChar(command[1], command[3], true));
+		fetchMap(links).addChar(DaisyChar.toKeyCase(command[2]), new DaisyChar(command[1], command[3], true));
 	} catch (err) {
 		doHelp(links, ["","add"]);
 	}
 }
 function doCopy(links, command) {
 	try {
-		let charStr = capitalCase(command[1]);
-		const thisMap = getMap(links);
+		let charStr = DaisyChar.toKeyCase(command[1]);
+		const thisMap = fetchMap(links);
 		const parent = thisMap.getChar(charStr);
 		charStr = DaisyChar.getCharTup(charStr)[0];
 		command[2].split(",").forEach((coord, i) => {
@@ -154,8 +143,8 @@ function doCopy(links, command) {
 }
 function doRemove(links, command) {
 	try {
-		const thisMap = getMap(links);
-		const charStr = capitalCase(command[1]);
+		const thisMap = fetchMap(links);
+		const charStr = DaisyChar.toKeyCase(command[1]);
 
 		let allRemoved = true;
 
@@ -170,8 +159,8 @@ function doRemove(links, command) {
 }
 function doAddGroup(links, command) {
 	try {
-		const thisMap = getMap(links);
-		const charName = capitalCase(command[2]);
+		const thisMap = fetchMap(links);
+		const charName = DaisyChar.toKeyCase(command[2]);
 		command[3].split(",").forEach((coord, i) => {
 			thisMap.addChar(charName, new DaisyChar(command[1], coord, true));
 		});
@@ -181,21 +170,21 @@ function doAddGroup(links, command) {
 }
 function doAddArea(links, command) {
 	try {
-		getMap(links).addArea(command[1], command[2]);
+		fetchMap(links).addArea(command[1], command[2]);
 	} catch (err) {
 		doHelp(links, ["","addarea"]);
 	}
 }
 function doMove(links, command) {
 	try {
-		getMap(links).getChar(capitalCase(command[1])).moveTo(command[2]);
+		fetchMap(links).getChar(DaisyChar.toKeyCase(command[1])).moveTo(command[2]);
 	} catch (err) {
 		doHelp(links, ["","move"]);
 	}
 }
 function doMoveGroup(links, command) {
 	try {
-		const charLs = getMap(links).getCharLs(capitalCase(command[1]));
+		const charLs = fetchMap(links).getCharLs(DaisyChar.toKeyCase(command[1]));
 		let numRemoved = 0;
 		command[2].split(",").forEach((coord, i) => {
 			while (i+numRemoved < charLs.length && charLs[i+numRemoved].removed) {numRemoved++;}
@@ -217,8 +206,8 @@ function doImage(links) {
 	try {
 		if (!(links.c instanceof TextChannel)) {doHelp(links, ["","image"]);}
 		else {
-			if (getMap(links) === undefined) {doNew(links,["","A1"]);}
-			let dMap = getMap(links);
+			if (fetchMap(links) === undefined) {doNew(links,["","A1"]);}
+			let dMap = fetchMap(links);
 			if (!dMap.img) {
 				sendTo(links, process.env.THREADPROMPT).then((message) => {
 					message.startThread({
@@ -235,7 +224,7 @@ function doImage(links) {
 											let entries = [];
 											msg.attachments.forEach((attachment, j) => {entries.push(attachment)});
 											thread.send({
-												content: codeCase(msg.content),
+												content: msg.content,
 												files: entries
 											});
 										}
@@ -259,11 +248,11 @@ function doImage(links) {
 }
 async function doMap(links) {
 	try {
-		if (getMap(links).map) {clearMap(getMap(links));;}
+		if (fetchMap(links).map) {clearMap(fetchMap(links));;}
 		sendTo(links, {
-			files: [new MessageAttachment(await getMap(links).buildMap(), links.c.id + "_map.png")]
+			files: [new MessageAttachment(await fetchMap(links).buildMap(), links.c.id + "_map.png")]
 		}).then((msg) => {
-			getMap(links).map = msg;
+			fetchMap(links).map = msg;
 		});
 	} catch (err) {
 		doHelp(links, ["","map"]);

@@ -12,6 +12,7 @@ ${prefix}addArea = Colour in any number of ranges as static objects
 ${prefix}hide = Hide a particular token
 ${prefix}move = Move a particular token to a new coordinate
 ${prefix}map = Generate and send map image
+${prefix}image = Create a thread to house images used in the map
 **Terms:**
 'coordinate/coord' = [Letter][Number], ie. A1, Z7; NOT 7Z
 'range/area' = [top-left coord]:[bottom-right coord], ie. B15:H19; NOT B19:H15
@@ -131,6 +132,15 @@ Display this channel's map (created with *prior* calls to the other functions).
 **No Arguments**
 	`;
 }
+function helpImage(prefix) {
+	return `
+Creates a new thread (either empty, or copied from an existing thread) for image/token pairs.
+**No Aliases**
+**No Arguments**
+**Additional**
+-To copy an existing thread, this command should be sent as a *reply* to that thread's seed message.
+	`;
+}
 
 function helpSwitch(prefix, command) {
 	if (command.length == 1) {return helpMain(prefix);}
@@ -161,6 +171,7 @@ function helpSwitch(prefix, command) {
 		case "movegroup": return helpMoveGroup(prefix);
 		case "display":
 		case "map": return helpMap(prefix);
+		case "image": return helpImage(prefix);
 
 		default: return helpDefault(prefix);
 	}

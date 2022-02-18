@@ -14,6 +14,9 @@ const TEAM = new Map([
 
 const MAX_PH = 1080, MAX_PV = 800;
 //--------------------------------------------------------------------HELPERS
+function toCapitalCase(str) {
+	return str[0].toUpperCase() + str.slice(1).toLowerCase();
+}
 function lesserOf(a, b) {
 	if (b<a) {return b;}
 	return a;
@@ -36,6 +39,13 @@ function parseRangeCoords(rangeCoords) {
 //--------------------------------------------------------------------MAIN
 //------------------------------------CHAR
 class DaisyChar {
+	static toKeyCase(str) {
+		let out = str.split(" ");
+		out.forEach((word, i) => {
+			word = toCapitalCase(word);
+		});
+		return out.join("-");
+	}
 	static getCharTup(charStr) {
 		return charStr.split("_");
 	}
@@ -56,7 +66,6 @@ class DaisyChar {
 	copy(_pos) {
 		return new DaisyChar(this.team, _pos, this.visible);
 	}
-
 	moveTo(_pos) {
 		this.pos = parseCoords(_pos);
 	}
@@ -80,6 +89,9 @@ class DaisyMap {
 
 		this.canvas = createCanvas((1+this.dims[0])*this.pS, (1+this.dims[1])*this.pS);
 		this.context = this.canvas.getContext("2d");
+		this.context.font = (this.pS/2-3*this.pM).toString()+"px Arial";
+		this.context.textBaseline = "middle";
+		this.context.textAlign = "center";
 
 		this.map = _map;
 		this.img = _img;
@@ -131,30 +143,16 @@ class DaisyMap {
 		});
 	}
 
-	prepMap() {
-		this.context.fillStyle = "#000";
-		this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-		this.context.textAlign = "center";
-		this.context.textBaseline = "middle";
-		this.context.font = (this.pS/2-3*this.pM).toString()+"px Arial";
-
+	drawBackground() {
 		this.context.fillStyle = DaisyChar.getColour("b");
 		this.fillArea(this.bg);
 		this.context.fillStyle = DaisyChar.getColour("o");
 		this.fillArea(this.obj);
 		this.context.fillStyle = DaisyChar.getColour("w");
 		this.fillArea(this.wall);
-
-		this.context.fillStyle = "#fff";
-		for (let h = 1; h <= this.dims[0]; h++) {this.writeCell(h.toString(), h, 0);}
-		for (let v = 1; v <= this.dims[1]; v++) {this.writeCell(String.fromCharCode(64+v), 0, v);}
 	}
-
-	buildMap() {
-		this.prepMap();
-
-		for (const [charName, charLs] of this.chars.entries()) {
+	drawTokens() {
+		this.chars.forEach((charLs, charName) => {
 			let charCode = DaisyChar.makeCharCode(charName);
 			let many = (charLs.length > 1);
 
@@ -166,7 +164,21 @@ class DaisyMap {
 					this.writeCell((many) ? charCode + (i+1).toString() : charCode, char.pos[0], char.pos[1]);
 				}
 			});
-		}
+		});
+	}
+
+	prepMap() {
+		this.context.fillStyle = "#000";
+		this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+		this.context.fillStyle = "#fff";
+		for (let h = 1; h <= this.dims[0]; h++) {this.writeCell(h.toString(), h, 0);}
+		for (let v = 1; v <= this.dims[1]; v++) {this.writeCell(String.fromCharCode(64+v), 0, v);}
+	}
+	buildMap() {
+		this.prepMap();
+		this.drawBackground();
+		this.drawTokens();
 
 		return this.canvas.toBuffer("image/png");
 	}
