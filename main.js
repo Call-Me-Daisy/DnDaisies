@@ -20,6 +20,9 @@ const HELPTIMER = 5000;
 const PREFIX = "--";
 
 //--------------------------------------------------------------------HELPERS
+function buildLinks(message) {
+	return {g: message.guild, c: message.channel, m: message};
+}
 function fetchMap(links) {
 	return allMaps.get(links.c.id);
 }
@@ -27,8 +30,8 @@ function fetchMap(links) {
 function fetchMessage(idC, idM) {
 	return bot.channels.cache.get(idC).messages.fetch(idM);
 }
-function fetchReference(refs) {
-	return fetchMessage(refs.channelId, refs.messageId);
+function fetchReference(msg) {
+	return fetchMessage(msg.reference.channelId, msg.reference.messageId);
 }
 function deleteFrom(idC, idM) {
 	fetchMessage(idC,idM).then((msg) => {
@@ -72,13 +75,13 @@ function doLog(links, command) {//TEMP: Debug helper
 		}
 	}
 	else if (links.m.reference !== null) {
-		fetchReference(links.m.reference).then((msg) => {console.log(msg)});
+		fetchReference(links.m).then((msg) => {console.log(msg)});
 	}
 }
 function doHelp(links, command) {
 	try {
 		makeTemp(sendTo(links, helpSwitch(PREFIX, command)));
-	} catch (err) {
+	} catch (e) {
 		doHelp(links, [""]);
 	}
 }
@@ -100,7 +103,7 @@ function doList(links, command) {
 		}
 		else {msg.push(msgMap.get(TEAM.get(command[1][0].toLowerCase())[0]).join("\n"));}
 		makeTemp(sendTo(links, msg.join("\n")));
-	} catch (err) {
+	} catch (e) {
 		doHelp(links, ["","list"]);
 	}
 }
@@ -109,7 +112,7 @@ function doNew(links, command) {
 		const [map, img] = DaisyMap.recover(fetchMap(links));
 		while(command.length < 5) {command.push(undefined);}
 		allMaps.set(links.c.id, new DaisyMap(command[1], command[2], command[3], command[4], map, img));
-	} catch (err) {
+	} catch (e) {
 		doHelp(links, ["","new"]);
 	}
 }
@@ -117,14 +120,14 @@ function doHide(links, command) {
 	try {
 		const char = fetchMap(links).getChar(command[1])
 		char.visible = !char.visible;
-	} catch (err) {
+	} catch (e) {
 		doHelp(links, ["hide"]);
 	}
 }
 function doAdd(links, command) {
 	try {
 		fetchMap(links).addChar(DaisyChar.toKeyCase(command[2]), new DaisyChar(command[1], command[3], true));
-	} catch (err) {
+	} catch (e) {
 		doHelp(links, ["","add"]);
 	}
 }
@@ -137,7 +140,7 @@ function doCopy(links, command) {
 		command[2].split(",").forEach((coord, i) => {
 			thisMap.addChar(charStr, parent.copy(coord));
 		});
-	} catch (err) {
+	} catch (e) {
 		doHelp(links, ["","copy"]);
 	}
 }
@@ -153,7 +156,7 @@ function doRemove(links, command) {
 			if (!char.removed) {allRemoved = false;}
 		});
 		if (allRemoved) {thisMap.removeCharLs(charStr);}
-	} catch (err) {
+	} catch (e) {
 		doHelp(links, ["","remove"]);
 	}
 }
@@ -164,21 +167,21 @@ function doAddGroup(links, command) {
 		command[3].split(",").forEach((coord, i) => {
 			thisMap.addChar(charName, new DaisyChar(command[1], coord, true));
 		});
-	} catch (err) {
+	} catch (e) {
 		doHelp(links.c.id, ["","addgroup"]);
 	}
 }
 function doAddArea(links, command) {
 	try {
 		fetchMap(links).addArea(command[1], command[2]);
-	} catch (err) {
+	} catch (e) {
 		doHelp(links, ["","addarea"]);
 	}
 }
 function doMove(links, command) {
 	try {
 		fetchMap(links).getChar(DaisyChar.toKeyCase(command[1])).moveTo(command[2]);
-	} catch (err) {
+	} catch (e) {
 		doHelp(links, ["","move"]);
 	}
 }
@@ -191,14 +194,14 @@ function doMoveGroup(links, command) {
 			if (i+numRemoved >= charLs.length) {return;}
 			charLs[i+numRemoved].moveTo(coord);
 		});
-	} catch (err) {
+	} catch (e) {
 		doHelp(links, ["","movegroup"]);
 	}
 }
 function doPing(links) {
 	try {
 		sendTo(links, `pong\t(${Date.now()-links.m.createdTimestamp} ms)`);
-	} catch (err) {
+	} catch (e) {
 		doHelp(links, ["","ping"]);
 	}
 }
@@ -216,7 +219,7 @@ function doImage(links) {
 					}).then((thread) => {
 						dMap.img = thread
 						if (links.m.reference !== null) {//TEMP: Quick reset after quit
-							fetchReference(links.m.reference).then((msg) => {
+							fetchReference(links.m).then((msg) => {
 								if (!msg.hasThread) {return;}
 								bot.channels.cache.get(msg.id).messages.fetch({limit:100}).then((messages) => {
 									messages.forEach((msg, i) => {
@@ -248,23 +251,89 @@ function doImage(links) {
 }
 async function doMap(links) {
 	try {
-		if (fetchMap(links).map) {clearMap(fetchMap(links));;}
-		sendTo(links, {
-			files: [new MessageAttachment(await fetchMap(links).buildMap(), links.c.id + "_map.png")]
-		}).then((msg) => {
+		let dMap = fetchMap(links);
+		if (dMap.map) {clearMap(dMap);}
+		sendTo(links, {files: [
+			new MessageAttachment(await dMap.buildMap(), links.c.id + "_map.png")
+		]}).then((msg) => {
 			fetchMap(links).map = msg;
 		});
-	} catch (err) {
+	} catch (e) {
+		throw e;
 		doHelp(links, ["","map"]);
 	}
 }
 //--------------------------------------------------------------------TESTING
+async function test_drawBackground(dMap, imgUrls) {
+	try {
+		let bg = imgUrls.get("Background");
+		if (bg === undefined) {throw "";}
+		dMap.context.drawImage(
+			await loadImage(imgUrls.get("Background")), dMap.pS, dMap.pS, dMap.dims[0]*dMap.pS, dMap.dims[1]*dMap.pS);
+	} catch (e) {
+		dMap.context.fillStyle = DaisyChar.getColour("b");
+		dMap.fillArea(dMap.bg);
+		dMap.context.fillStyle = DaisyChar.getColour("o");
+		dMap.fillArea(dMap.obj);
+		dMap.context.fillStyle = DaisyChar.getColour("w");
+		dMap.fillArea(dMap.wall);
+	}
+}
+async function test_drawTokens(dMap, imgUrls) {
+	for (const [charName, charLs] of dMap.chars) {
+		let many = (charLs.size > 1);
+		let img, txt;
+		try {
+			let url = imgUrls.get(charName);
+			if (url === undefined) {throw "";}
+			img = loadImage(imgUrls.get(charName));
+			txt = false;
+		} catch (e) {
+			txt = DaisyChar.makeCharCode(charName);
+			img = false;
+		}
+		console.log(txt, "=>", img);
+
+		for (const [i, char] of charLs.entries()) {
+			if (char.visible && !char.removed) {
+				if (txt) {
+					dMap.context.fillStyle = char.team;
+					dMap.fillCell(char.pos[0], char.pos[1]);
+					dMap.context.fillStyle = "#000";
+					dMap.writeCell((many) ? txt + (i+1).toString() : txt, char.pos[0], char.pos[1]);
+				}
+				else {
+					dMap.drawCell(await img, char.pos[0], char.pos[1]);
+					if (many) {
+						dMap.context.fillStyle = char.team;
+						this.writeCell((i+1).toString(), char.pos[0], char.pos[1]);
+					}
+				}
+			}
+		}
+	}
+}
+async function doTest(links, command) {
+	let dMap = fetchMap(links);
+	let imgUrls = await dMap.fetchImgUrls();
+
+	dMap.prepMap();
+	await test_drawBackground(dMap, imgUrls);
+	await test_drawTokens(dMap, imgUrls);
+
+	makeTemp(sendTo(links, {
+		content: "TESTING",
+		files: [new MessageAttachment(await dMap.canvas.toBuffer("image/png"), "test.png")]
+	}));
+}
 
 //--------------------------------------------------------------------MAIN
-function mainSwitch(links, command) {
+async function mainSwitch(links, command) {
 	if (command[0].startsWith(PREFIX)) {
 		console.log(command);
 		switch (command[0].slice(PREFIX.length).toLowerCase()) {
+			case "test": doTest(links, command); break;
+
 			case "quit": doQuit(); break;
 			case "log": doLog(links, command); break;
 			case "help": doHelp(links, command); break;
@@ -307,16 +376,26 @@ bot.once("ready", () => {
 	console.log(`Logged in as ${bot.user.tag}`);
 });
 
-bot.on("messageCreate", (message) => {
+bot.on("messageCreate", async (message) => {
 	if (!message.author.bot) {
 		console.log(`#${message.author.discriminator} @${message.channel.id}`);
 
-		let shouldDelete = undefined;
-		const links = {g: message.channel.guild, c: message.channel, m: message};
-		message.content.split("\n").forEach((messageLine, i) => {
-			let temp = mainSwitch(links, messageLine.split(" "));
+		let msg, shouldDelete;
+		if (message.reference !== null && message.content.toLowerCase() === `${PREFIX}parse`) {
+			shouldDelete = false;
+			msg = await fetchReference(message);
+			message.delete();
+		}
+		else {
+			shouldDelete = undefined;
+			msg = message;
+		}
+
+		const links = buildLinks(msg);
+		for (const messageLine of msg.content.split("\n")) {
+			let temp = await mainSwitch(links, messageLine.split(" "));
 			if (temp !== undefined && shouldDelete != !temp) {shouldDelete = temp;}
-		});
+		};
 		if (shouldDelete != false) {message.delete();}
 	}
 });

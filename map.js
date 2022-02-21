@@ -1,5 +1,5 @@
 const fs = require('fs')
-const { createCanvas, loadImage } = require('canvas')
+const { createCanvas, loadImage} = require('canvas')
 
 //--------------------------------------------------------------------CONSTANTS
 const TEAM = new Map([
@@ -75,6 +75,12 @@ class DaisyMap {
 	static recover(dMap) {
 		return (dMap === undefined) ? [false, false] : [dMap.map, dMap.img];
 	}
+	static canvasWrapper(w, h) {
+		return createCanvas(w, h);
+	}
+	static loadWrapper(url) {
+		return loadImage(url);
+	}
 
 	constructor(_dims, _bg, _obj, _wall, _map, _img, _pH = MAX_PH, _pV = MAX_PV) {
 		this.dims = parseCoords(_dims);
@@ -130,6 +136,9 @@ class DaisyMap {
 	fillCell(h, v) {
 		this.context.fillRect(h*this.pS+this.pM, v*this.pS+this.pM, this.pS-2*this.pM, this.pS-2*this.pM);
 	}
+	drawCell(img, h, v) {
+		this.context.drawImage(img, h*this.pS+this.pM, v*this.pS+this.pM, this.pS-2*this.pM, this.pS-2*this.pM);
+	}
 	writeCell(text, h, v) {
 		this.context.fillText(text, (2*h+1)*this.pS/2, (2*v+1)*this.pS/2);
 	}
@@ -143,28 +152,19 @@ class DaisyMap {
 		});
 	}
 
-	drawBackground() {
-		this.context.fillStyle = DaisyChar.getColour("b");
-		this.fillArea(this.bg);
-		this.context.fillStyle = DaisyChar.getColour("o");
-		this.fillArea(this.obj);
-		this.context.fillStyle = DaisyChar.getColour("w");
-		this.fillArea(this.wall);
-	}
-	drawTokens() {
-		this.chars.forEach((charLs, charName) => {
-			let charCode = DaisyChar.makeCharCode(charName);
-			let many = (charLs.length > 1);
+	async fetchImgUrls() {
+		if (!this.img) {return false;}
 
-			charLs.forEach((char, i) => {
-				if (char.visible && !char.removed) {
-					this.context.fillStyle = char.team;
-					this.fillCell(char.pos[0], char.pos[1]);
-					this.context.fillStyle = "#000";
-					this.writeCell((many) ? charCode + (i+1).toString() : charCode, char.pos[0], char.pos[1]);
+		let out = new Map();
+		await this.img.messages.fetch({limit:100}).then((messages) => {
+			messages.forEach((msg, i) => {
+				if (msg.attachments.size > 0) {
+					out.set(DaisyChar.toKeyCase(msg.content), msg.attachments.entries().next().value[1].url);
 				}
 			});
-		});
+		})
+
+		return out;
 	}
 
 	prepMap() {
@@ -175,10 +175,60 @@ class DaisyMap {
 		for (let h = 1; h <= this.dims[0]; h++) {this.writeCell(h.toString(), h, 0);}
 		for (let v = 1; v <= this.dims[1]; v++) {this.writeCell(String.fromCharCode(64+v), 0, v);}
 	}
-	buildMap() {
+
+	async drawBackground(imgUrls) {
+		try {
+			let bg = imgUrls.get("Background");
+			if (bg === undefined) {throw "";}
+			this.context.drawImage(
+				await loadImage(bg), this.pS, this.pS, this.dims[0]*this.pS, this.dims[1]*this.pS);
+		} catch (e) {
+			this.context.fillStyle = DaisyChar.getColour("b");
+			this.fillArea(this.bg);
+			this.context.fillStyle = DaisyChar.getColour("o");
+			this.fillArea(this.obj);
+			this.context.fillStyle = DaisyChar.getColour("w");
+			this.fillArea(this.wall);
+		}
+	}
+	async drawTokens(imgUrls) {
+		for (const [charName, charLs] of this.chars) {
+			let many = (charLs.size > 1);
+			let img, txt;
+			try {
+				let url = imgUrls.get(charName);
+				if (url === undefined) {throw "";}
+				img = loadImage(url);
+				txt = false;
+			} catch (e) {
+				txt = DaisyChar.makeCharCode(charName);
+				img = false;
+			}
+			for (const [i, char] of charLs.entries()) {
+				if (char.visible && !char.removed) {
+					if (txt) {
+						this.context.fillStyle = char.team;
+						this.fillCell(char.pos[0], char.pos[1]);
+						this.context.fillStyle = "#000";
+						this.writeCell((many) ? txt + (i+1).toString() : txt, char.pos[0], char.pos[1]);
+					}
+					else {
+						this.drawCell(await img, char.pos[0], char.pos[1]);
+						if (many) {
+							this.context.fillStyle = char.team;
+							this.writeCell((i+1).toString(), char.pos[0], char.pos[1]);
+						}
+					}
+				}
+			}
+		}
+	}
+	async buildMap() {
+		let imgUrls = this.fetchImgUrls();
+
 		this.prepMap();
-		this.drawBackground();
-		this.drawTokens();
+		await this.drawBackground(await imgUrls);
+		await this.drawTokens(await imgUrls);
 
 		return this.canvas.toBuffer("image/png");
 	}
