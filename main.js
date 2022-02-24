@@ -11,8 +11,8 @@ const bot = new Client({intents:[
     Intents.FLAGS.GUILD_MESSAGES,
     Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
     Intents.FLAGS.DIRECT_MESSAGES,
-    Intents.FLAGS.DIRECT_MESSAGE_REACTIONS]
-});
+    Intents.FLAGS.DIRECT_MESSAGE_REACTIONS
+]});
 
 const allMaps = new Map();
 
@@ -264,67 +264,8 @@ async function doMap(links) {
 	}
 }
 //--------------------------------------------------------------------TESTING
-async function test_drawBackground(dMap, imgUrls) {
-	try {
-		let bg = imgUrls.get("Background");
-		if (bg === undefined) {throw "";}
-		dMap.context.drawImage(
-			await loadImage(imgUrls.get("Background")), dMap.pS, dMap.pS, dMap.dims[0]*dMap.pS, dMap.dims[1]*dMap.pS);
-	} catch (e) {
-		dMap.context.fillStyle = DaisyChar.getColour("b");
-		dMap.fillArea(dMap.bg);
-		dMap.context.fillStyle = DaisyChar.getColour("o");
-		dMap.fillArea(dMap.obj);
-		dMap.context.fillStyle = DaisyChar.getColour("w");
-		dMap.fillArea(dMap.wall);
-	}
-}
-async function test_drawTokens(dMap, imgUrls) {
-	for (const [charName, charLs] of dMap.chars) {
-		let many = (charLs.size > 1);
-		let img, txt;
-		try {
-			let url = imgUrls.get(charName);
-			if (url === undefined) {throw "";}
-			img = loadImage(imgUrls.get(charName));
-			txt = false;
-		} catch (e) {
-			txt = DaisyChar.makeCharCode(charName);
-			img = false;
-		}
-		console.log(txt, "=>", img);
-
-		for (const [i, char] of charLs.entries()) {
-			if (char.visible && !char.removed) {
-				if (txt) {
-					dMap.context.fillStyle = char.team;
-					dMap.fillCell(char.pos[0], char.pos[1]);
-					dMap.context.fillStyle = "#000";
-					dMap.writeCell((many) ? txt + (i+1).toString() : txt, char.pos[0], char.pos[1]);
-				}
-				else {
-					dMap.drawCell(await img, char.pos[0], char.pos[1]);
-					if (many) {
-						dMap.context.fillStyle = char.team;
-						this.writeCell((i+1).toString(), char.pos[0], char.pos[1]);
-					}
-				}
-			}
-		}
-	}
-}
 async function doTest(links, command) {
-	let dMap = fetchMap(links);
-	let imgUrls = await dMap.fetchImgUrls();
-
-	dMap.prepMap();
-	await test_drawBackground(dMap, imgUrls);
-	await test_drawTokens(dMap, imgUrls);
-
-	makeTemp(sendTo(links, {
-		content: "TESTING",
-		files: [new MessageAttachment(await dMap.canvas.toBuffer("image/png"), "test.png")]
-	}));
+	//----------
 }
 
 //--------------------------------------------------------------------MAIN

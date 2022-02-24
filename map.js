@@ -193,7 +193,7 @@ class DaisyMap {
 	}
 	async drawTokens(imgUrls) {
 		for (const [charName, charLs] of this.chars) {
-			let many = (charLs.size > 1);
+			let many = (charLs.length > 1);
 			let img, txt;
 			try {
 				let url = imgUrls.get(charName);
