@@ -1,5 +1,5 @@
 const fs = require('fs')
-const { createCanvas, loadImage } = require('canvas')
+const { createCanvas, loadImage} = require('canvas')
 
 //--------------------------------------------------------------------CONSTANTS
 const TEAM = new Map([
@@ -12,7 +12,7 @@ const TEAM = new Map([
 	["w", ["#000", "Walls"]]
 ]);
 
-const MAX_PH = 1080, MAX_PV = 800;
+const MAX_PH = 1920, MAX_PV = 1080;
 //--------------------------------------------------------------------HELPERS
 function toCapitalCase(str) {
 	return str[0].toUpperCase() + str.slice(1).toLowerCase();
@@ -27,23 +27,23 @@ function parseCoords(coord) {
 function parseRangeCoords(rangeCoords) {
 	if (rangeCoords === undefined) {rangeCoords = "A1:"+_dims;}
 	let out = rangeCoords.split(",");
-	out.forEach((range,i) => {
+	for (const [i, range] of out.entries()) {
 		out[i] = range.split(":");
 		if (out[i].length < 2) {out[i].push(out[i][0]);}
-		out[i].forEach((corner,j) => {
+		for (const [j, corner] of out[i].entries()) {
 			out[i][j] = parseCoords(corner);
-		});
-	});
+		}
+	}
 	return out;
 }
 //--------------------------------------------------------------------MAIN
 //------------------------------------CHAR
 class DaisyChar {
 	static toKeyCase(str) {
-		let out = str.split(" ");
-		out.forEach((word, i) => {
-			word = toCapitalCase(word);
-		});
+		let out = [];
+		for (const word of str.split(" ")) {
+			out.push(toCapitalCase(word));
+		}
 		return out.join("-");
 	}
 	static getCharTup(charStr) {
@@ -122,49 +122,41 @@ class DaisyMap {
 
 			default: throw `Type ${type} not valid!`;
 		};
-		parseRangeCoords(rangeCoords).forEach((area, i) => {
+		for (const area of parseRangeCoords(rangeCoords)) {
 			areaHolder.push(area);
-		});
+		}
 	}
 
 	fillCell(h, v) {
 		this.context.fillRect(h*this.pS+this.pM, v*this.pS+this.pM, this.pS-2*this.pM, this.pS-2*this.pM);
 	}
+	drawCell(img, h, v) {
+		this.context.drawImage(img, h*this.pS+this.pM, v*this.pS+this.pM, this.pS-2*this.pM, this.pS-2*this.pM);
+	}
 	writeCell(text, h, v) {
 		this.context.fillText(text, (2*h+1)*this.pS/2, (2*v+1)*this.pS/2);
 	}
 	fillArea(area) {
-		area.forEach((range, i) => {
+		for (const range of area) {
 			for (let h = range[0][0]; h <= range[1][0]; h++) {
 				for (let v = range[0][1]; v <= range[1][1]; v++) {
 					this.fillCell(h,v);
 				}
 			}
-		});
+		}
 	}
 
-	drawBackground() {
-		this.context.fillStyle = DaisyChar.getColour("b");
-		this.fillArea(this.bg);
-		this.context.fillStyle = DaisyChar.getColour("o");
-		this.fillArea(this.obj);
-		this.context.fillStyle = DaisyChar.getColour("w");
-		this.fillArea(this.wall);
-	}
-	drawTokens() {
-		this.chars.forEach((charLs, charName) => {
-			let charCode = DaisyChar.makeCharCode(charName);
-			let many = (charLs.length > 1);
+	async fetchImgUrls() {
+		if (!this.img) {return false;}
 
-			charLs.forEach((char, i) => {
-				if (char.visible && !char.removed) {
-					this.context.fillStyle = char.team;
-					this.fillCell(char.pos[0], char.pos[1]);
-					this.context.fillStyle = "#000";
-					this.writeCell((many) ? charCode + (i+1).toString() : charCode, char.pos[0], char.pos[1]);
-				}
-			});
-		});
+		let out = new Map();
+		for (const [key, msg] of await this.img.messages.fetch({limit:100})) {
+			if (msg.attachments.size > 0) {
+				out.set(DaisyChar.toKeyCase(msg.content), msg.attachments.entries().next().value[1].url);
+			}
+		}
+
+		return out;
 	}
 
 	prepMap() {
@@ -175,10 +167,59 @@ class DaisyMap {
 		for (let h = 1; h <= this.dims[0]; h++) {this.writeCell(h.toString(), h, 0);}
 		for (let v = 1; v <= this.dims[1]; v++) {this.writeCell(String.fromCharCode(64+v), 0, v);}
 	}
-	buildMap() {
+	async drawBackground(imgUrls) {
+		try {
+			let bg = imgUrls.get("Background");
+			if (bg === undefined) {throw "";}
+			this.context.drawImage(
+				await loadImage(bg), this.pS, this.pS, this.dims[0]*this.pS, this.dims[1]*this.pS);
+		} catch (e) {
+			this.context.fillStyle = DaisyChar.getColour("b");
+			this.fillArea(this.bg);
+			this.context.fillStyle = DaisyChar.getColour("o");
+			this.fillArea(this.obj);
+			this.context.fillStyle = DaisyChar.getColour("w");
+			this.fillArea(this.wall);
+		}
+	}
+	async drawTokens(imgUrls) {
+		for (const [charName, charLs] of this.chars) {
+			let many = (charLs.length > 1);
+			let img, txt;
+			try {
+				let url = imgUrls.get(charName);
+				if (url === undefined) {throw "";}
+				img = loadImage(url);
+				txt = false;
+			} catch (e) {
+				txt = DaisyChar.makeCharCode(charName);
+				img = false;
+			}
+			for (const [i, char] of charLs.entries()) {
+				if (char.visible && !char.removed) {
+					if (txt) {
+						this.context.fillStyle = char.team;
+						this.fillCell(char.pos[0], char.pos[1]);
+						this.context.fillStyle = "#000";
+						this.writeCell((many) ? txt + (i+1).toString() : txt, char.pos[0], char.pos[1]);
+					}
+					else {
+						this.drawCell(await img, char.pos[0], char.pos[1]);
+						if (many) {
+							this.context.fillStyle = char.team;
+							this.writeCell((i+1).toString(), char.pos[0], char.pos[1]);
+						}
+					}
+				}
+			}
+		}
+	}
+	async buildMap() {
+		let imgUrls = await this.fetchImgUrls();
+
 		this.prepMap();
-		this.drawBackground();
-		this.drawTokens();
+		await this.drawBackground(imgUrls);
+		await this.drawTokens(imgUrls);
 
 		return this.canvas.toBuffer("image/png");
 	}
