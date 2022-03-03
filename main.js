@@ -123,7 +123,7 @@ function doNew(links, command) {
 	try {
 		const [map, img] = DaisyMap.recover(fetchMap(links));
 		while(command.length < 5) {command.push(undefined);}
-		allMaps.set(links.c.id, new DaisyMap(command[1], command[2], command[3], command[4], map, img));
+		allMaps.set(links.c.id, new DaisyMap(map, img, command[1], command[2]));
 	} catch (e) {
 		doHelp(links, ["","new"]);
 	}
@@ -313,7 +313,7 @@ async function mainSwitch(links, command) {
 		}
 		return true;
 	}
-	if (command[0].toLowerCase.startsWith("keep")) {return false;}
+	if (command[0].toLowerCase().startsWith("keep")) {return false;}
 	return undefined;
 }
 

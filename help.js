@@ -14,16 +14,17 @@ ${prefix}move = Move a particular token to a new coordinate
 ${prefix}map = Generate and send map image
 ${prefix}image = Create a thread to house images used in the map
 **Terms:**
-'coordinate/coord' = [Letter][Number], ie. A1, Z7; NOT 7Z
-'range/area' = [top-left coord]:[bottom-right coord], ie. B15:H19; NOT B19:H15
+'coordinate/coord' = [Letter][Number] (OR [Row-Column]), ie. A1 (1-1), Z7 (26-7); NOT 7Z (7-26 -> G26)
+'range/area' = [top-left coord]:[bottom-right coord], ie. B15:H19; NOT B19:H15, H15:B19, or H19:B15
 'CSV' = A comma-seperated list (NO spaces), ie. A1,B7,G8
 **Notes:**
 Only co-ordinates&ranges should be case sensitive; please report a bug if this is not the case.
+^This does, however, mean you can't have two token names *only* differ by capitalization.
 	`;
 }
-function helpDefault(prefix) {
+function helpDefault(prefix, commandWord) {
 	return `
-Sorry, I can't do that.
+Unknown command: ${commandWord}
 For my command list, please use: ${prefix}help
 	`;
 }
@@ -173,7 +174,7 @@ function helpSwitch(prefix, command) {
 		case "map": return helpMap(prefix);
 		case "image": return helpImage(prefix);
 
-		default: return helpDefault(prefix);
+		default: return helpDefault(prefix, command[1]);
 	}
 }
 

@@ -21,20 +21,29 @@ function lesserOf(a, b) {
 	if (b<a) {return b;}
 	return a;
 }
-function parseCoords(coord) {
-	return [parseInt(coord.slice(1),10), coord.charCodeAt(0)-64];
+function parseCoord(coord) {
+	let coordSplit = coord.split("-");
+	return (coordSplit.length > 1) ? parseNumCoord(coordSplit) : parseStrCoord(coord);
+}
+function parseStrCoord(coord) {
+	return [parseInt(coord.slice(1), 10), coord.charCodeAt(0)-64];
+}
+function parseNumCoord(coordSplit) {
+	return [parseInt(coordSplit[1],10), parseInt(coordSplit[0],10)];
 }
 function parseRangeCoords(rangeCoords) {
-	if (rangeCoords === undefined) {rangeCoords = "A1:"+_dims;}
 	let out = rangeCoords.split(",");
 	for (const [i, range] of out.entries()) {
 		out[i] = range.split(":");
 		if (out[i].length < 2) {out[i].push(out[i][0]);}
 		for (const [j, corner] of out[i].entries()) {
-			out[i][j] = parseCoords(corner);
+			out[i][j] = parseCoord(corner);
 		}
 	}
 	return out;
+}
+function createStrCoord(nums) {
+	return String.fromCharCode(64+nums[1]) + nums[0];
 }
 //--------------------------------------------------------------------MAIN
 //------------------------------------CHAR
@@ -58,7 +67,7 @@ class DaisyChar {
 
 	constructor(_team, _pos, _visible = false) {
 		this.team = (_team[0] == "#") ? _team : DaisyChar.getColour(_team[0].toLowerCase())
-		this.pos = parseCoords(_pos);
+		this.pos = parseCoord(_pos);
 		this.visible = _visible;
 		this.removed = false;
 	}
@@ -67,7 +76,7 @@ class DaisyChar {
 		return new DaisyChar(this.team, _pos, this.visible);
 	}
 	moveTo(_pos) {
-		this.pos = parseCoords(_pos);
+		this.pos = parseCoord(_pos);
 	}
 }
 //------------------------------------MAP
@@ -76,20 +85,20 @@ class DaisyMap {
 		return (dMap === undefined) ? [false, false] : [dMap.map, dMap.img];
 	}
 
-	constructor(_dims, _bg, _obj, _wall, _map, _img, _pH = MAX_PH, _pV = MAX_PV) {
-		this.dims = parseCoords(_dims);
+	constructor(_map, _img, _dims, _bg, _pH = MAX_PH, _pV = MAX_PV) {
+		this.dims = parseCoord(_dims);
 		this.pS = lesserOf(Math.floor(_pH/this.dims[0]), Math.floor(_pV/this.dims[1]));
 		this.pM = Math.ceil(this.pS/64);
 		this.chars = new Map();
 
-		if (_bg === undefined || _bg === null) {_bg = "A1:"+_dims;}
+		if (_bg === undefined || _bg === null) {_bg = "A1:"+createStrCoord(this.dims);}
 		this.bg = parseRangeCoords(_bg);
-		this.obj = (_obj === undefined || _obj === null) ? [] : parseRangeCoords(_obj);
-		this.wall = (_wall === undefined || _wall === null) ? [] : parseRangeCoords(_wall);
+		this.obj = [];
+		this.wall = [];
 
-		this.canvas = createCanvas((1+this.dims[0])*this.pS, (1+this.dims[1])*this.pS);
+		this.canvas = createCanvas((2+this.dims[0])*this.pS, (2+this.dims[1])*this.pS);
 		this.context = this.canvas.getContext("2d");
-		this.context.font = (this.pS/2-3*this.pM).toString()+"px Arial";
+		this.context.font = (2*this.pS/3-3*this.pM).toString()+"px Arial";
 		this.context.textBaseline = "middle";
 		this.context.textAlign = "center";
 
@@ -164,8 +173,12 @@ class DaisyMap {
 		this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
 		this.context.fillStyle = "#fff";
-		for (let h = 1; h <= this.dims[0]; h++) {this.writeCell(h.toString(), h, 0);}
-		for (let v = 1; v <= this.dims[1]; v++) {this.writeCell(String.fromCharCode(64+v), 0, v);}
+		for (const h of [0, this.dims[0]+1]) {
+			for (let v = 1; v <= this.dims[1]; v++) {this.writeCell(String.fromCharCode(64+v), h, v);}
+		}
+		for (const v of [0, this.dims[1]+1]) {
+			for (let h = 1; h <= this.dims[0]; h++) {this.writeCell(h.toString(), h, v);}
+		}
 	}
 	async drawBackground(imgUrls) {
 		try {
