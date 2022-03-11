@@ -151,7 +151,7 @@ function doAddGroup(links, command) {
 			thisMap.addChar(charName, new DaisyChar(command[1], coord, true));
 		}
 	} catch (e) {
-		doHelp(links.c.id, ["","addgroup"]);
+		doHelp(links, ["","addgroup"]);
 	}
 }
 function doAddArea(links, command) {
@@ -341,7 +341,7 @@ bot.on("messageCreate", async (message) => {
 			let temp = await mainSwitch(links, messageLine.split(" "));
 			if (temp !== undefined && shouldDelete != !temp) {shouldDelete = temp;}
 		};
-		if (shouldDelete != false) {message.delete().catch((error) => {});}
+		if (shouldDelete) {message.delete().catch((error) => {});}
 	}
 });
 //--------------------------------------------------------------------FINALIZE
