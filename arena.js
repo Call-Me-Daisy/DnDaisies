@@ -2,7 +2,20 @@ const { createCanvas, loadImage} = require('canvas')
 //--------------------------------------------------------------------CONSTANTS
 const MAX_PH = 1920, MAX_PV = 1080;
 const FONT_STR = "px Arial";
-//--------------------------------------------------------------------HELPERS
+//--------------------------------------------------------------------HELP
+function scaleAlpha(_colStr, _r = 0.5) {
+	return (function(_len){
+		switch (_len % 4) {
+			case 3: return _colStr + (255*_r).toString(16)[0];
+			case 2: return _colStr + (255*_r).toString(16);
+			case 0: return (function(){
+				let n = Math.floor(_len / 3) - 1;
+				let a = parseInt(_colStr.slice(_len - n), 16);
+				return _colStr.slice(0, _len - n) + (a*_r).toString(16);
+			})();
+		}
+	})(_colStr.length - 1);
+}
 //------------------------------------RECT
 class Rect {
 	constructor(_x, _y, _h, _v) {
@@ -75,9 +88,15 @@ class Brush extends Rect {
 	clear() {
 		this.ctx.clearRect(this.x, this.y, this.h, this.v);
 	}
-	fill() {
+	fillRect() {
 		this.ctx.fillRect(this.x, this.y, this.h, this.v);
 	}
+	fillEllipse() {
+		this.ctx.beginPath();
+		this.ctx.ellipse(this.x + this.h/2, this.y + this.v/2, this.h/2, this.v/2, 0, 0, Math.PI*2);
+		this.ctx.fill();
+	}
+
 	write(_txt) {
 		this.ctx.fillText(_txt, this.x + this.h/2, this.y + this.v/2);
 	}
@@ -101,29 +120,39 @@ class Brush extends Rect {
 	}
 }
 class PaintStyle {
-	static GRID = 1;
+	//------------CELL
+	static RECT = 1;
+	static rect(_brush) {
+		_brush.fillRect();
+	}
+	static ELLIPSE = 2;
+	static ellipse(_brush) {
+		_brush.fillEllipse();
+	}
+	//------------MAIN
+	static FILL = 1;
+	static fill(_brush, _token, _args, _named) {
+		_brush.ctx.fillStyle = _args.colour;
+		_brush.setFrom(_token);
+		_args.cell(_brush);
+		if (_named) {
+			_brush.ctx.fillStyle = "#000";
+			_brush.write(_args.code + ((_args.many) ? (_args.i).toString() : ""));
+		}
+	}
+	static GRID = 2;
 	static grid(_brush, _token, _args, _named) {
 		_brush.ctx.fillStyle = _args.colour;
 		_brush.setDim(1, 1);
 		for (let y = _token.y; y < _token.y + _token.v; y++) {
 			for (let x = _token.x; x < _token.x + _token.h; x++) {
 				_brush.setPos(x, y);
-				_brush.fill();
+				_args.cell(_brush);
 			}
 		}
 		if (_named) {
 			_brush.ctx.fillStyle = "#fff";
 			_brush.setFrom(_token).write(_args.code + ((_args.many) ? (_args.i).toString() : ""));
-		}
-	}
-	static RECT = 2;
-	static rect(_brush, _token, _args, _named) {
-		_brush.ctx.fillStyle = _args.colour;
-		_brush.setFrom(_token);
-		_brush.fill();
-		if (_named) {
-			_brush.ctx.fillStyle = "#000";
-			_brush.write(_args.code + ((_args.many) ? (_args.i).toString() : ""));
 		}
 	}
 	static IMAGE = 3;
@@ -136,66 +165,74 @@ class PaintStyle {
 				_brush.write((_args.i).toString());
 			}
 		} catch (e) {
-			PaintStyle.rect(_brush, _token, _args);
+			PaintStyle.fill(_brush, _token, _args);
 		}
 	}
-	static ELLIPSE = 4;
-	static ellipse(_brush, _token, _args, _named) {
-		_brush.ctx.fillStyle = _args.colour;
-		_brush.setFrom(_token);
-		_brush.ctx.beginPath();
-		_brush.ctx.ellipse(_brush.x + _brush.h/2, _brush.y + _brush.v/2, _brush.h/2, _brush.v/2, 0, 0, Math.PI*2);
-		_brush.ctx.fill();
-		if (_named) {
-			_brush.ctx.fillStyle = "#000";
-			_brush.setPos(_token.x + _token.h, _token.y + _token.v);
-			_brush.write(_args.code + ((_args.many) ? (_args.i).toString() : ""));
-		}
-	}
-	static SWARM = 5;
+	static SWARM = 4;
 	static swarm(_brush, _token, _args, _named) {
-		PaintStyle.grid(_brush, _token, _args, _named);
+		PaintStyle.grid(_brush, _token, _args, false);
 		if (_named) {
 			_brush.ctx.fillStyle = "#000";
+			let code = _args.code + ((_args.many) ? (_args.i).toString() : "");
 			_brush.reset();
 			for (const i of [0,1]) {
 				for (const j of [0,1]) {
-					_brush.setPos(_token.x + i*_brush.h, _token.y + j*_brush.v)
-					_brush.write(_args.num);
+					_brush.setPos(_token.x + i*(_token.h-1), _token.y + j*(_token.v-1));
+					_brush.write(code);
 				}
 			}
 		}
 	}
-
-	static getStyle(_code) {
-		switch (Math.abs(_code)) {
-			case PaintStyle.RECT: return PaintStyle.rect;
-			case PaintStyle.IMAGE: return PaintStyle.image;
-			case PaintStyle.GRID: return PaintStyle.grid;
-			case PaintStyle.ELLIPSE: return PaintStyle.ellipse;
-			case PaintStyle.SWARM: return PaintStyle.swarm;
+	static CONCENTRIC = 5;
+	static concentric(_brush, _token, _args, _named) {
+		PaintStyle.fill(_brush, _token, _args, false);
+		_brush.ctx.fillStyle = scaleAlpha(_args.colour);
+		_brush.centerStretch(3);
+		_args.cell(_brush);
+		if (_named) {
+			_brush.ctx.fillStyle = "#fff";
+			_brush.write(_args.code + ((_args.many) ? (_args.i).toString() : ""));
 		}
-		throw `Invalid paint code: ${_code}`;
+	}
+	//------------SWITCH
+	static getStyle(_styleCodes) {
+		return {
+			main: (function(_code){
+				switch (Math.abs(_code)) {
+					case PaintStyle.FILL: return PaintStyle.fill;
+					case PaintStyle.IMAGE: return PaintStyle.image;
+					case PaintStyle.GRID: return PaintStyle.grid;
+					case PaintStyle.SWARM: return PaintStyle.swarm;
+					case PaintStyle.CONCENTRIC: return PaintStyle.concentric;
+				}
+			})(_styleCodes.main),
+			cell: (function(_code){
+				switch(Math.abs(_code)) {
+					case PaintStyle.RECT: return PaintStyle.rect;
+					case PaintStyle.ELLIPSE: return PaintStyle.ellipse;
+				}
+			})(_styleCodes.cell)
+		};
 	}
 }
 class GuideStyle {
 	static RECT = 1;
 	static rect(_brush, _args) {
-		_brush.set(_args.pos1[0], _args.pos1[1], _args.dims[0], _args.dims[1]).adjust();
+		_brush.set(_args.origin[0], _args.origin[1], _args.dim[0], _args.dim[1]).adjust();
 		_brush.ctx.strokeRect(_brush.x, _brush.y, _brush.h, _brush.v);
 	}
 	static LINE = 2;
 	static line(_brush, _args) {
-		_brush.setPos(_args.pos1[0], _args.pos1[1]).adjust();
+		_brush.setPos(_args.origin[0], _args.origin[1]).adjust();
 		_brush.ctx.beginPath();
 		_brush.ctx.moveTo(_brush.x, _brush.y);
-		_brush.setPos(_args.pos2[0], _args.pos2[1]).adjust();
+		_brush.setPos(_args.pos[0], _args.pos[1]).adjust();
 		_brush.ctx.lineTo(_brush.x, _brush.y);
 		_brush.ctx.stroke();
 	}
 	static ELLIPSE = 3;
 	static ellipse(_brush, _args) {
-		_brush.setPos(_args.pos1[0], _args.pos1[1]).adjust();
+		_brush.setPos(_args.origin[0], _args.origin[1]).adjust();
 		_brush.setDim(_args.radii[0], (_args.radii[1] === undefined) ? _args.radii[0] : _args.radii[1]);
 		_brush.ctx.beginPath();
 		_brush.ctx.ellipse(_brush.x, _brush.y, _brush.h, _brush.v, 0, 0, Math.PI*2);
@@ -203,20 +240,21 @@ class GuideStyle {
 	}
 	static SUNDAIL = 4;
 	static sundail(_brush, _args) {
-		try {
-			GuideStyle.line(_brush, _args);
-			_args.radii = [Math.sqrt((_args.pos2[0] - _args.pos1[0])**2 + (_args.pos2[1] - _args.pos1[1])**2)];
+		if (_args.pos[0] === undefined) {
 			GuideStyle.ellipse(_brush, _args);
-		} catch (e) {
-			GuideStyle.ellipse(_brush, _args);
-			_args.pos2 = [_args.pos1[0] + _args.radii[0], _args.pos1[1]];
+			_args.pos = [_args.origin[0] + _args.radii[0], _args.origin[1]];
 			GuideStyle.line(_brush, _args);
+		}
+		else {
+			GuideStyle.line(_brush, _args);
+			_args.radii = [Math.sqrt((_args.pos[0] - _args.origin[0])**2 + (_args.pos[1] - _args.origin[1])**2)];
+			GuideStyle.ellipse(_brush, _args);
 		}
 	}
 	static CONE = 5;
 	static cone(_brush, _args) {
-		_brush.setPos(_args.pos1[0], _args.pos1[1]).adjust();
-		_brush.setDim(_args.radii-1, (_args.radii[1] === undefined) ? _args.radii[0]-1 : _args.radii[1]-1);
+		_brush.setPos(_args.origin[0], _args.origin[1]).adjust();
+		_brush.setDim(_args.radii[0]-1, (_args.radii[1] === undefined) ? _args.radii[0]-1 : _args.radii[1]-1);
 
 		let c = Math.cos(_args.theta), s = Math.sin(_args.theta);
 		let dr0 = [_brush.h*s, _brush.h*-c];
@@ -233,6 +271,13 @@ class GuideStyle {
 
 		_brush.reset();
 	}
+	static SPIDER = 6;
+	static spider(_brush, _args) {
+		for (const pos of _args.posLs) {
+			_args.pos = pos;
+			GuideStyle.line(_brush, _args);
+		}
+	}
 
 	static getStyle(_code) {
 		switch(Math.abs(_code)) {
@@ -241,23 +286,33 @@ class GuideStyle {
 			case GuideStyle.ELLIPSE: return GuideStyle.ellipse;
 			case GuideStyle.SUNDAIL: return GuideStyle.sundail;
 			case GuideStyle.CONE: return GuideStyle.cone;
+			case GuideStyle.SPIDER: return GuideStyle.spider;
 		}
 		throw `Invalid guide code: ${_code}`;
 	}
 }
 //------------------------------------TOKEN
 class Token extends Rect {
-	constructor(_range, _visible = true) {
-		super(_range[0], _range[1], _range[2], _range[3]);
+	constructor(_pos, _dim, _visible = true) {
+		super(_pos[0], _pos[1], _dim[0], _dim[1]);
 		this.visible = _visible;
 		this.removed = false;
+		this.z = (_pos.length > 2 && _pos[2]) ? _pos[2] : 0;
 	}
 
 	setPos(_pos) {
+		if (_pos.length > 2 && (_pos[2] || _pos[2] === 0)) {this.z = _pos[2];}
 		return super.setPos(_pos[0], _pos[1]);
 	}
-	setDim(_dims) {
-		return super.setDim(_dims[0], _dims[1]);
+	setDim(_dim) {
+		return super.setDim(_dim[0], _dim[1]);
+	}
+
+	getPos() {
+		return [this.x, this.y, this.z];
+	}
+	getCenter() {
+		return [this.x + (this.h - 1)/2, this.y + (this.v - 1)/2, this.z];
 	}
 }
 //------------------------------------TOKENGROUP
@@ -265,59 +320,76 @@ class TokenGroup {
 	static makeCode(_name) {
 		return _name[0].toUpperCase()+_name[_name.length-1].toLowerCase();
 	}
-	constructor(_name, _dims, _styleCode, _colour, _layer) {
-		this.dims = _dims;
-		this.styleCode = _styleCode;
+	constructor(_name, _dim, _styleCodes, _colour, _layer) {
+		this.dim = _dim;
+		this.styleCode = _styleCodes;
 		this.colour = _colour;
 		this.layer = _layer;
 
 		this.code = TokenGroup.makeCode(_name);
-		this.style = PaintStyle.getStyle(_styleCode);
+		this.style = PaintStyle.getStyle(_styleCodes);
 		this.tokens = [];
 	}
 
-	push(_pos, _dims, _visible) {
-		this.tokens.push(new Token(_pos.concat((_dims[0]) ? _dims : this.dims), _visible));
+	push(_pos, _dim, _visible) {
+		this.tokens.push(new Token(_pos, (_dim) ? _dim : this.dim, _visible));
 	}
-	pushMany(_rangeLs, _visible) {
-		for (const range of _rangeLs) {
-			this.push(range.slice(0,2), range.slice(2), _visible);
+	pushMany(_posLs, _dim, _visible) {
+		let parseDim = (_dim && _dim instanceof Array) ?
+			((_dim[0] instanceof Array) ?
+				function(_i) {return _dim[_i];}
+				: function(_i) {return _dim;}
+			) : function(_i) {return [false];}
+		for (const [i, pos] of _posLs.entries()) {
+			this.push(pos, parseDim(i), _visible);
 		}
 	}
 
-	async paintAll(_brush, _imgUrls, _name) {
-		let args = {
-			colour: this.colour,
-			many: (this.tokens.length > 1),
-			code: this.code
-		};
-		let currentStyle = this.style;
-		if (Math.abs(this.styleCode) === PaintStyle.IMAGE) {
-			if (_imgUrls && _imgUrls.get(_name) !== undefined) {args.img = loadImage(_imgUrls.get(_name));}
-			else {currentStyle = PaintStyle.rect;}
+	isEmpty() {
+		for (const token of this.tokens) {
+			if (!token.removed) {return false;}
 		}
-		for (const [i, token] of this.tokens.entries()) {
-			if (token.visible && !token.removed) {
-				args.i = i;
-				await currentStyle(_brush, token, args, (this.styleCode < 0));
+		return true;
+	}
+
+	async paintAll(_brush, _imgUrls, _name) {
+		if (this.tokens.length > 0) {
+			let args = {
+				colour: this.colour,
+				many: (this.tokens.length > 1),
+				code: this.code,
+				cell: this.style.cell
+			};
+			let currentStyle = this.style.main;
+			switch (Math.abs(this.styleCode.main)) {
+				case PaintStyle.IMAGE:
+					if (_imgUrls && _imgUrls.get(_name) !== undefined) {args.img = loadImage(_imgUrls.get(_name));}
+					else {currentStyle = PaintStyle.fill;}
+					break;
+			}
+			for (const [i, token] of this.tokens.entries()) {
+				if (token.visible && !token.removed) {
+					args.i = i;
+					await currentStyle(_brush, token, args, (this.styleCode.main < 0));
+				}
 			}
 		}
 	}
 }
 //------------------------------------ARENA
 class Arena {
-	constructor(_dims, _feedback = console.log, _feedhelp = "USER_ERROR:", _pH = MAX_PH, _pV = MAX_PV) {
-		this.dims = _dims;
+	constructor(_dim, _feedback = console.log, _feedhelp = "USER_ERROR:", _pH = MAX_PH, _pV = MAX_PV) {
+		this.dim = _dim;
 		this.feedhelp = _feedhelp;
 		this.feedback = _feedback; //void function(_feedhelp, string) => tells user what they did wrong
-		let pS = Math.floor(Math.min(_pH/_dims[0], _pV/_dims[1]));
+		let pS = Math.floor(Math.min(_pH/_dim[0], _pV/_dim[1]));
 		let pM = Math.ceil(pS/64);
 
-		this.canvas = createCanvas((2+_dims[0])*pS, (2+_dims[1])*pS);
+		this.canvas = createCanvas((2+_dim[0])*pS, (2+_dim[1])*pS);
 		this.groups = new Map();
 		this.topLayer = 0;
-		this.newGroup(PaintStyle.IMAGE, 0, "Background", "#000", _dims);
-		this.addToGroup("Background", [1,1].concat(_dims));
+		this.newGroup({main: PaintStyle.IMAGE, cell: PaintStyle.RECT}, 0, "Background", "#000", _dim);
+		this.addToGroupSplit("Background", [1,1,0]);
 
 		this.brush = new Brush(this.canvas.getContext("2d"), pS, pM);
 		this.brush.ctx.textAlign = "center";
@@ -348,20 +420,36 @@ class Arena {
 		return (group) ? group.tokens[_i] : false;
 	}
 
-	addToGroup(_name, _ranges, _visible = true) {
+	addToGroup(_name, _range, _visible = true) {
 		let group = this.requireGroup(_name);
 		if (group) {
-			if (_ranges instanceof Array) {
-				group.pushMany((_ranges[0] instanceof Array) ? _ranges : [_ranges], _visible);
+			if (_range instanceof Array) {
+				if (_range[0] instanceof Array) {
+					for (const range of _range) {
+						group.push(range[0], range[1], _visible)
+					}
+				}
+				else {group.push(_range[0], _range[1], _visible);}
 			}
 			else {
-				this.userFeedback(`Position coords must be in form [x,y].`)
+				this.userFeedback(`Position coords must be in form [x,y,{z}].`)
 			}
 		}
 	}
-	newGroup(_styleCode, _layer, _name, _colour, _dims = [1,1], _override = false) {
+	addToGroupSplit(_name, _pos, _dim = false, _visible = true) {
+		let group = this.requireGroup(_name);
+		if (group) {
+			if (_pos instanceof Array) {
+				(_pos[0] instanceof Array) ? group.pushMany(_pos, _dim, _visible) : group.push(_pos, _dim, _visible);
+			}
+			else {
+				this.userFeedback(`Position coords must be in form [x,y,{z}].`)
+			}
+		}
+	}
+	newGroup(_styleCodes, _layer, _name, _colour, _dim = [1,1], _override = false) {
 		if (_override || this.groups.get(_name) === undefined) {
-			this.groups.set(_name, new TokenGroup(_name, _dims, _styleCode, _colour, _layer));
+			this.groups.set(_name, new TokenGroup(_name, _dim, _styleCodes, _colour, _layer));
 			if (_layer > this.topLayer) {this.topLayer = _layer;}
 		}
 		else {
@@ -376,12 +464,7 @@ class Arena {
 		let group = this.requireGroup(_name);
 		if (group) {
 			group.tokens[_i].removed = true;
-			if (_andGroup) {
-				for (const token of group.tokens) {
-					if (!token.removed) {_andGroup = false; break;}
-				}
-				if (_andGroup) {this.removeGroup(_name);}
-			}
+			if (_andGroup && group.isEmpty()) {this.removeGroup(_name);}
 		}
 	}
 
@@ -397,15 +480,17 @@ class Arena {
 		this.brush.scaleFont(1);
 		this.brush.ctx.fillStyle = "#000";
 		this.brush.setAbs(0, 0, this.canvas.width, this.canvas.height)
-		this.brush.fill();
+		this.brush.fillRect();
 
 		this.brush.ctx.fillStyle = "#fff";
 		this.brush.reset();
-		for (const h of [0, this.dims[0]+1]) {
-			for (let v = 1; v <= this.dims[1]; v++) {this.brush.setPos(h,v).write(String.fromCharCode(64+v));}
+		for (const h of [0, this.dim[0]+1]) {
+			for (let v = 1; v <= this.dim[1]; v++) {
+				this.brush.setPos(h,v).write(String.fromCharCode(v + ((v > 26) ? 70 : 64)));
+			}
 		}
-		for (const v of [0, this.dims[1]+1]) {
-			for (let h = 1; h <= this.dims[0]; h++) {this.brush.setPos(h,v).write(h.toString());}
+		for (const v of [0, this.dim[1]+1]) {
+			for (let h = 1; h <= this.dim[0]; h++) {this.brush.setPos(h,v).write(h.toString());}
 		}
 		this.brush.scaleFont(0.75);
 	}

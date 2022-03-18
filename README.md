@@ -1,26 +1,26 @@
 # DnDaisies
-Discord bot for making a DnD map within a channel.
+Discord bot for making and displaying an interactive DnD map within a channel.
 
 New this update:
-  - Removed placeholder names:
-    - map.js -> arena.js
-    - DaisyMap -> Arena
-	- DaisyChar -> Token
-  - Large-scale reworking to focus on self-containment of .js files:
-    - arena contains all of the actual functionality of token&arena building
-	- main focuses on handling user input (discord in this case, but open to other wrapping)
-	  ^ .map and .img now exist alongside arena (rather than as children) in main's default object - 'holder'
-  - Most Token functionality has been moved to the new TokenGroup class:
-    - identical tokens will be drawn identically, so it need only be loaded once
-	- tokens still have individual dimensions for cases such as enlarge/reduce
-  - Focused effort to remove awkwardness of commands:
-    - redirection commands remove unnecessary keywords
-	- optional parameters allow splitting commands into multiple lines for more readability
-  - Guide function
+  - Bugfixing:
+  	- Removed need to specify token 0 when that's the only token in the group
+	- Actually added swarm to command list
+  - Functionality:
+  	- New 'utils.js' file, for functions and objects that are generally useful across projects
+	- Altered multimap to be a builder class as its only affect happens at object creation
+	- Added treemap class, to reduce necessary checks within instruction lists
+	- On-quit instruction lists are now by request
+	- Resize tokens/groups
+	- Hide/Remove multiple tokens by giving --hide/--remove a CSV of token indexes
+	- Hide/Remove now has options (all true/all false/flip current); previous settings are default mode
+	- Increased painting options:
+	  - Cells can now be elliptical or rectangular as required
+	  - Added Concentric PaintStyle (think flaming sphere)
+  - Experimentation:
+  	- More in-depth error handling (remove feedback from arena entirely?)
 
 Deprecated this update:
-  - help.js
-    ^ Something to this effect will be brought back later, but not in this form
+  - Helper function 'applyFromBack' broke cone guide (?), and it was lazy to use anyway so it's gone now.
 
 Currently supports (General):
   - Self-deleting messages where appropriate
@@ -34,7 +34,7 @@ Currently supports (DnD):
 	- thread for images to prevent clogging channels
 
 Currently in progress:
-  - Generate instruction list from arena so parse function can be utilised by users
+  - Generate instruction list from arena so parse function can be utilised by users (still not perfect)
 
 Future plans:
   - (Channel/Guild?)-specific customisation of command prefix (Standard = --)
@@ -44,5 +44,5 @@ Stretch goals:
   - Add some basic 5e utility (dice rolls, stat tracking, etc.) so sessions can be run entirely from within the channel.
 
 Scrapped plans:
-  - Auto-crop background image
-  - Auto-remove/colour-code backgrounds of character tokens
+  - Auto-crop background image -- it would still need user input to be general, so just crop it manually?
+  - Auto-remove/colour-code backgrounds of character tokens -- ditto
