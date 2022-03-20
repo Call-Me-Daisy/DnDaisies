@@ -18,7 +18,7 @@ const bot = new Client({intents:[
 
 const allMaps = new Map();
 
-const HELPTIMER = 3000;
+const HELPTIMER = 10000;
 const PREFIX = "--";
 
 const SHORTCUTS = new Map([
@@ -677,7 +677,7 @@ async function mainSwitch(_links, _command) {
 		console.log(_command);
 		try {
 			commandHelper.get(_command[0])(_links, _command);
-		} catch (e) { throw e; sendTemp(_links, `Unknown command: ${_command[0]}`); }
+		} catch (e) { sendTemp(_links, `Unknown command: ${_command[0]}`); }
 		return true;
 	}
 	if (_command[0].toLowerCase().startsWith("keep")) {return false;}
@@ -686,6 +686,7 @@ async function mainSwitch(_links, _command) {
 
 bot.once("ready", () => {
 	console.log(`Logged in as ${bot.user.tag}`);
+	bot.user.setActivity("Ask me to --explain :D");
 });
 
 bot.on("messageCreate", async (message) => {

@@ -69,14 +69,14 @@
 	"code" : {
 		"type" : "keyword",
 		"msg" : [
-			"How members of a **group** are identified on the **map**"
+			"How members of a **group** are identified on the **map**",
 			"Note: Currently the first and last characters of their **name**, so plan **names** accordingly!"
 		]
 	},
 	"index" : {
 		"type" : "keyword",
 		"msg" : [
-			"Needed to specify a particular **token** within a **group** (alongside its **name**)."
+			"Needed to specify a particular **token** within a **group** (alongside its **name**).",
 			"Note: Index starts at 0, and 0 is assumed for a **group** with only one **token**",
 			"Note: A **token**'s index is displayed alongside its **code** on the **map**"
 		]
@@ -84,8 +84,8 @@
 	"arguments" : {
 		"type" : "keyword",
 		"msg" : [
-			"Additional information to pass to **commands**."
-			"Arguments marked like {so} are optional, whereas [these] are mandatory for it to work as intended."
+			"Additional information to pass to **commands**.",
+			"Arguments marked like {so} are optional, whereas [these] are mandatory for it to work as intended.",
 			"Note: The order to pass arguments to each **command** is denoted numerically in its explain text",
 			"Note: Some arguments are denoted non-numerically (ie. {REPLY}), which are hopefully self-explanatory"
 		]
@@ -100,8 +100,8 @@
 	"team" : {
 		"type" : "keyword",
 		"msg" : [
-			"Colour-code your **tokens** to more easily get the lay of the **arena**."
-			"There are presets, but you can specify a colour directly with HEX#rgba (ie. #f00f = solid red)."
+			"Colour-code your **tokens** to more easily get the lay of the **arena**.",
+			"There are presets, but you can specify a colour directly with HEX#rgba (ie. #f00f = solid red).",
 			"PRESETS: party = green, allies = blue, enemies = red, neutrals = brown, objects = grey, walls = black"
 		]
 	},
@@ -131,7 +131,7 @@
 	"image" : {
 		"type" : "command",
 		"msg" : [
-			"Make the bot adopt/create a thread within which to look for images whenever it draws a **map**."
+			"Make the bot adopt/create a thread within which to look for images whenever it draws a **map**.",
 			"{REPLY} Message with child thread from which to read images.",
 			"^Default: A new, empty, thread will be created."
 		]
@@ -153,15 +153,15 @@
 	"list" : {
 		"type" : "command",
 		"msg" : [
-			"Display a breakdown of a/all **team(s)**, and the display & code names of each **group** within them."
-			"{1} The team to break down."
+			"Display a breakdown of a/all **team(s)**, and the display & code names of each **group** within them.",
+			"{1} The team to break down.",
 			"^Default: Just lists all teams together."
 		]
 	},
 	"distance" : {
 		"type" : "command",
 		"msg" : [
-			"Cacluate the distance between two **coords** or **tokens** (or a combination)."
+			"Cacluate the distance between two **coords** or **tokens** (or a combination).",
 			"[1] First coord or token.",
 			"[2] Second coord or token."
 		]
@@ -169,7 +169,7 @@
 	"instructions" : {
 		"type" : "command",
 		"msg" : [
-			"Make the bot print out a list of commands to get back to the current **arena**."
+			"Make the bot print out a list of commands to get back to the current **arena**.",
 			"Note: Mainly useful if you have two arenas you need to flick between",
 			"*No Arguments*"
 		]
@@ -315,7 +315,7 @@
 	"static" : {
 		"type" : "group",
 		"msg" : [
-			
+
 		]
 	},
 	"object" : {
