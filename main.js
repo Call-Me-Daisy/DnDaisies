@@ -2,6 +2,8 @@ require("dotenv").config();
 
 const {Client, Intents, MessageAttachment, ThreadChannel} = require("discord.js");
 const {createCanvas, loadImage} = require("canvas");
+const fs = require("fs");
+
 const {Arena, PaintStyle, GuideStyle} = require("./arena");
 const {MultiMap, TreeMap} = require("./utils");
 
@@ -16,7 +18,7 @@ const bot = new Client({intents:[
 
 const allMaps = new Map();
 
-const HELPTIMER = 10000;
+const HELPTIMER = 3000;
 const PREFIX = "--";
 
 const SHORTCUTS = new Map([
@@ -356,8 +358,41 @@ function doLog(_links, _command) {//log [link code]/(->msg_to_log)--log
 }
 //------------------------------------USER
 //------------GENERAL
+const helpHelper = (function(_json){
+	for (const key in _json) {
+		if (_json.hasOwnProperty(key)) {
+			let el = _json[key];
+			el.aliases = [];
+			switch (el.type) {
+				case "category": _json.categories.msg.push(Case.capital(key)); break;
+				case "keyword": _json.keywords.msg.push(Case.capital(key)); break;
+				case "command": _json.commands.msg.push(Case.capital(key)); break;
+				case "group": _json.groups.msg.push(Case.capital(key)); break;
+				case "guide": _json.guides.msg.push(Case.capital(key)); break;
+				case "alias":
+					el.aliases.push(el.msg);
+					for (const alias of _json[el.msg].aliases) {
+						el.aliases.push(alias);
+						_json[alias].aliases.push(key);
+					}
+					_json[el.msg].aliases.push(key);
+					el.msg = _json[el.msg].msg;
+					break;
+			}
+		}
+	}
+	for (const key in _json) {
+		if (_json.hasOwnProperty(key)) {
+			let el = _json[key];
+			let front = [`__**${Case.capital(key)}**__`];
+			if (el.aliases && el.aliases.length > 0) {front.push(`__Aliases__: ${el.aliases.join(", ")}`);}
+			el.msg = front.concat(el.msg).join("\n");
+		}
+	}
+	return _json;
+})(JSON.parse(fs.readFileSync("./help.json")));
 function doHelp(_links, _command) {//help ()/[command]
-
+	sendTemp(_links, helpHelper[(_command.length > 1) ? _command[1].toLowerCase() : "categories"].msg);
 }
 async function doImage(_links, _command) {//image ()/(->msg_with_thread)--image
 	try {

@@ -1,0 +1,359 @@
+{
+	"categories" : {
+		"type" : "null",
+		"msg" : [
+			"Lists just for convenience; you shouldn't specify the category of the thing you want help with.\n"
+		]
+	},
+	"keywords" : {
+		"type" : "category",
+		"msg" : [
+			"Things you need to know about before you can properly use this bot.\n"
+		]
+	},
+	"arenas" : {
+		"type" : "keyword",
+		"msg" : [
+			"The battlefield that is currently being tracked.",
+			"While very customisable with images and **tokens**, it is at heart a grid - going up to 52x78 in size.",
+			"This will *always* be contain a co-ordinate reference border to help with positioning."
+		]
+	},
+	"map" : {
+		"type" : "keyword",
+		"msg" : [
+			"A top-down view of the current **arena**."
+		]
+	},
+	"coordinate" : {
+		"type" : "keyword",
+		"msg" : [
+			"A way to specify a certain position within the **arena**.",
+			"Specified using the **arena**'s reference border (ie. A4) or with numbers directly (ie. 1-4).",
+			"Although the **map** is 2D, the height off the ground can also be tracked (ie. A4-3 or 1-4-3).",
+			"Note: Height is optional, as (if not specified) a height of 0 is assumed"
+		]
+	},
+	"range" : {
+		"type" : "keyword",
+		"msg" : [
+			"A way to specify a whole area within the **arena**.",
+			"Specified with the top-left and bottom-right **coordinates** and a colon (ie. A4:G7).",
+			"Note: Any acceptable **coordinate** variation is also fine for use here"
+		]
+	},
+	"token" : {
+		"type" : "keyword",
+		"msg" : [
+			"A catch-all term for an individual unit that can exist in the **arena**.",
+			"Contains position, size, and whether they are invisible and/or removed from the arena.",
+			"Note: You must specify the **name** *and* **index** (ie. Zombie 1) of a token, unless there's only one"
+		]
+	},
+	"group" : {
+		"type" : "keyword",
+		"msg" : [
+			"A collection of similar **token**s.",
+			"Contains a list of **tokens** and the **styles** used to draw them.",
+			"There are some preset **style** combinations, but you can mix and match to create whatever you need.",
+			"Note: All **tokens** exist within a group, as the group is what actually draws it onto the **map**."
+		]
+	},
+	"name" : {
+		"type" : "keyword",
+		"msg" : [
+			"The name the **arena** uses to refer to a certain **group**.",
+			"Note: Two **group** names cannot differ by capitalisation alone, as that is normalised by the **arena**"
+		]
+	},
+	"code" : {
+		"type" : "keyword",
+		"msg" : [
+			"How members of a **group** are identified on the **map**"
+			"Note: Currently the first and last characters of their **name**, so plan **names** accordingly!"
+		]
+	},
+	"index" : {
+		"type" : "keyword",
+		"msg" : [
+			"Needed to specify a particular **token** within a **group** (alongside its **name**)."
+			"Note: Index starts at 0, and 0 is assumed for a **group** with only one **token**",
+			"Note: A **token**'s index is displayed alongside its **code** on the **map**"
+		]
+	},
+	"arguments" : {
+		"type" : "keyword",
+		"msg" : [
+			"Additional information to pass to **commands**."
+			"Arguments marked like {so} are optional, whereas [these] are mandatory for it to work as intended."
+			"Note: The order to pass arguments to each **command** is denoted numerically in its explain text",
+			"Note: Some arguments are denoted non-numerically (ie. {REPLY}), which are hopefully self-explanatory"
+		]
+	},
+	"csv" : {
+		"type" : "keyword",
+		"msg" : [
+			"'Comma-Separated Variables' (ie. A1,B2,C3).",
+			"Note: Variables should *only* be separated by commas - especially important that there are no spaces"
+		]
+	},
+	"team" : {
+		"type" : "keyword",
+		"msg" : [
+			"Colour-code your **tokens** to more easily get the lay of the **arena**."
+			"There are presets, but you can specify a colour directly with HEX#rgba (ie. #f00f = solid red)."
+			"PRESETS: party = green, allies = blue, enemies = red, neutrals = brown, objects = grey, walls = black"
+		]
+	},
+	"coord" : {
+		"type" : "alias",
+		"msg" : "coordinate"
+	},
+	"args" : {
+		"type" : "alias",
+		"msg" : "arguments"
+	},
+	"commands" : {
+		"type" : "category",
+		"msg" : [
+			"Instructions you can give to the bot.\n"
+		]
+	},
+	"help" : {
+		"type" : "command",
+		"msg" : [
+			"This! Why did you ask how this works? 0.o",
+			"Argsuments:",
+			"{1} What category/command/keyword you need explained.",
+			"^Default: Shows a list of **categories**."
+		]
+	},
+	"image" : {
+		"type" : "command",
+		"msg" : [
+			"Make the bot adopt/create a thread within which to look for images whenever it draws a **map**."
+			"{REPLY} Message with child thread from which to read images.",
+			"^Default: A new, empty, thread will be created."
+		]
+	},
+	"new" : {
+		"type" : "command",
+		"msg" : [
+			"Create a new **arena**! Generally should be the first command given.",
+			"[1] **Coord** of the **arena**'s bottom-right corner (top-left is *always* A1)."
+		]
+	},
+	"guide" : {
+		"type" : "command",
+		"msg" : [
+			"Draw a temporary, transparent, shape onto the map.",
+			"[1...] Shape to draw; see **guides** for options & more detail."
+		]
+	},
+	"list" : {
+		"type" : "command",
+		"msg" : [
+			"Display a breakdown of a/all **team(s)**, and the display & code names of each **group** within them."
+			"{1} The team to break down."
+			"^Default: Just lists all teams together."
+		]
+	},
+	"distance" : {
+		"type" : "command",
+		"msg" : [
+			"Cacluate the distance between two **coords** or **tokens** (or a combination)."
+			"[1] First coord or token.",
+			"[2] Second coord or token."
+		]
+	},
+	"instructions" : {
+		"type" : "command",
+		"msg" : [
+			"Make the bot print out a list of commands to get back to the current **arena**."
+			"Note: Mainly useful if you have two arenas you need to flick between",
+			"*No Arguments*"
+		]
+	},
+	"newgroup" : {
+		"type" : "command",
+		"msg" : [
+			"Not currently implemented"
+		]
+	},
+	"movegroup" : {
+		"type" : "command",
+		"msg" : [
+			"Specify **coords** to move (non-**removed**) members of a **group**, in order of **index**.",
+			"[1] **Name** of **group** to move.",
+			"[2] **csv** of **coords** to move **tokens** to.",
+			"{3} (true/false) = Set moved **tokens** to (visible/hidden).",
+			"^Default: **Token** visibility is unchanged."
+		]
+	},
+	"hidegroup" : {
+		"type" : "command",
+		"msg" : [
+			"Change visibility of an entire **group**.",
+			"[1] **Name** of **group** to edit.",
+			"{2} (true/false/!) = Set visibility of **tokens** to (true/false/the opposite of its current state).",
+			"^Default: Assumes !."
+		]
+	},
+	"removegroup" : {
+		"type" : "command",
+		"msg" : [
+			"Delete an entire **group** from the **arena**.",
+			"[1] **Name** of **group** to remove."
+		]
+	},
+	"resizegroup" : {
+		"type" : "command",
+		"msg" : [
+			"Change the dimensions of every **token** in a **group**.",
+			"[1] **Name** of **group** to resize.",
+			"[2] **Coord** of new dimensions (ie. B4 or 2-4 = 2x4 inclusive).",
+			"{3} (true/false) = (Also/Don't) change the group default dimensions.",
+			"^Default: Assumes true."
+		]
+	},
+	"newtoken" : {
+		"type" : "command",
+		"msg" : [
+			"Create new **token**(s) at given **coord**(s).",
+			"[1] **Name** of **group** to add to.",
+			"[2] **CSV** of **Coord**/**Range** of new **token**(s).",
+			"{3} (true/false) = The new **token**(s) should be (visible/hidden).",
+			"^Default: Assumes true.",
+			"Note: Each token created at a **coord** will copy the dimensions of the **token** at **index** 0"
+		]
+	},
+	"move" : {
+		"type" : "command",
+		"msg" : [
+			"Move a single **token** to a given **coord**.",
+			"[1] **Token** to be moved.",
+			"[2] **Coord** to move it to.",
+			"{3} (true/false) = Set moved **tokens** to (visible/hidden).",
+			"^Default: **Token** visibilty is unchanged."
+		]
+	},
+	"hide" : {
+		"type" : "command",
+		"msg" : [
+			"Change visibilty of **token**(s) within a **group**.",
+			"[1] **Name** of **group** to edit.",
+			"[2] **CSV** of **index** representing all **tokens** to edit.",
+			"{3} (true/false/!) = Set visibility of **token**(s) to (true/false/the opposite of the current state).",
+			"^Default: Assumes !.",
+			"Note: [2] can be omitted if there is only one **token** in the **group**"
+		]
+	},
+	"remove" : {
+		"type" : "command",
+		"msg" : [
+			"Change removed status of **token**(s) within a **group**.",
+			"[1] **Name** of **group** to edit.",
+			"[2] **CSV** of **index** representing all **tokens** to edit.",
+			"{3} (true/false/!) = **Token**(s) should be (removed/reinstated/the opposite of the current status).",
+			"^Default: Assumes true.",
+			"Note: [2] can be omitted if there is only one **token** in the **group**"
+		]
+	},
+	"resize" : {
+		"type" : "command",
+		"msg" : [
+			"Change the dimensions of **token**(s) within a **group**.",
+			"[1] **Name** of **group** to edit.",
+			"[2] **CSV** of **index** representing all **tokens** to resize.",
+			"[3] **CSV** of **coords** for new dimensions (ie. B4 or 2-4 = 2x4 inclusive).",
+			"Note: [2] can be omitted if there is only one **token** in the **group**",
+			"Note: If [3] is one variable instead of a CSV, all **tokens** will be set to those dimensions"
+		]
+	},
+	"explain" : {
+		"type" : "alias",
+		"msg" : "help"
+	},
+	"thread" : {
+		"type" : "alias",
+		"msg" : "image"
+	},
+	"preview" : {
+		"type" : "alias",
+		"msg" : "guide"
+	},
+	"tokens" : {
+		"type" : "alias",
+		"msg" : "list"
+	},
+	"crow" : {
+		"type" : "alias",
+		"msg" : "distance"
+	},
+	"collapse" : {
+		"type" : "alias",
+		"msg" : "instructions"
+	},
+	"revealgroup" : {
+		"type" : "alias",
+		"msg" : "hidegroup"
+	},
+	"copy" : {
+		"type" : "alias",
+		"msg" : "newtoken"
+	},
+	"reveal" : {
+		"type" : "alias",
+		"msg" : "hide"
+	},
+	"groups" : {
+		"type" : "category",
+		"msg" : [
+			"A subset of **commands** to make adding **groups** simpler and easier.\n"
+		]
+	},
+	"static" : {
+		"type" : "group",
+		"msg" : [
+			
+		]
+	},
+	"object" : {
+		"type" : "group",
+		"msg" : [
+
+		]
+	},
+	"grid" : {
+		"type" : "group",
+		"msg" : [
+
+		]
+	},
+	"creature" : {
+		"type" : "group",
+		"msg" : [
+
+		]
+	},
+	"swarm" : {
+		"type" : "group",
+		"msg" : [
+
+		]
+	},
+	"concentric" : {
+		"type" : "group",
+		"msg" : [
+
+		]
+	},
+	"area" : {
+		"type" : "alias",
+		"msg" : "grid"
+	},
+	"circle" : {
+		"type" : "alias",
+		"msg" : "concentric"
+	}
+}
