@@ -12,21 +12,21 @@
 		]
 	},
 	"arenas" : {
-		"type" : "keyword",
+		"type" : "keywords",
 		"msg" : [
 			"The battlefield that is currently being tracked.",
 			"While very customisable with images and **tokens**, it is at heart a grid - going up to 52x78 in size.",
-			"This will *always* be contain a co-ordinate reference border to help with positioning."
+			"This will *always* contain a co-ordinate reference border to help with positioning."
 		]
 	},
 	"map" : {
-		"type" : "keyword",
+		"type" : "keywords",
 		"msg" : [
 			"A top-down view of the current **arena**."
 		]
 	},
 	"coordinate" : {
-		"type" : "keyword",
+		"type" : "keywords",
 		"msg" : [
 			"A way to specify a certain position within the **arena**.",
 			"Specified using the **arena**'s reference border (ie. A4) or with numbers directly (ie. 1-4).",
@@ -35,7 +35,7 @@
 		]
 	},
 	"range" : {
-		"type" : "keyword",
+		"type" : "keywords",
 		"msg" : [
 			"A way to specify a whole area within the **arena**.",
 			"Specified with the top-left and bottom-right **coordinates** and a colon (ie. A4:G7).",
@@ -43,7 +43,7 @@
 		]
 	},
 	"token" : {
-		"type" : "keyword",
+		"type" : "keywords",
 		"msg" : [
 			"A catch-all term for an individual unit that can exist in the **arena**.",
 			"Contains position, size, and whether they are invisible and/or removed from the arena.",
@@ -51,7 +51,7 @@
 		]
 	},
 	"group" : {
-		"type" : "keyword",
+		"type" : "keywords",
 		"msg" : [
 			"A collection of similar **token**s.",
 			"Contains a list of **tokens** and the **styles** used to draw them.",
@@ -60,21 +60,21 @@
 		]
 	},
 	"name" : {
-		"type" : "keyword",
+		"type" : "keywords",
 		"msg" : [
 			"The name the **arena** uses to refer to a certain **group**.",
 			"Note: Two **group** names cannot differ by capitalisation alone, as that is normalised by the **arena**"
 		]
 	},
 	"code" : {
-		"type" : "keyword",
+		"type" : "keywords",
 		"msg" : [
 			"How members of a **group** are identified on the **map**",
 			"Note: Currently the first and last characters of their **name**, so plan **names** accordingly!"
 		]
 	},
 	"index" : {
-		"type" : "keyword",
+		"type" : "keywords",
 		"msg" : [
 			"Needed to specify a particular **token** within a **group** (alongside its **name**).",
 			"Note: Index starts at 0, and 0 is assumed for a **group** with only one **token**",
@@ -82,7 +82,7 @@
 		]
 	},
 	"arguments" : {
-		"type" : "keyword",
+		"type" : "keywords",
 		"msg" : [
 			"Additional information to pass to **commands**.",
 			"Arguments marked like {so} are optional, whereas [these] are mandatory for it to work as intended.",
@@ -91,14 +91,14 @@
 		]
 	},
 	"csv" : {
-		"type" : "keyword",
+		"type" : "keywords",
 		"msg" : [
 			"'Comma-Separated Variables' (ie. A1,B2,C3).",
 			"Note: Variables should *only* be separated by commas - especially important that there are no spaces"
 		]
 	},
 	"team" : {
-		"type" : "keyword",
+		"type" : "keywords",
 		"msg" : [
 			"Colour-code your **tokens** to more easily get the lay of the **arena**.",
 			"There are presets, but you can specify a colour directly with HEX#rgba (ie. #f00f = solid red).",
@@ -120,7 +120,7 @@
 		]
 	},
 	"help" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"This! Why did you ask how this works? 0.o",
 			"Argsuments:",
@@ -129,7 +129,7 @@
 		]
 	},
 	"image" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"Make the bot adopt/create a thread within which to look for images whenever it draws a **map**.",
 			"{REPLY} Message with child thread from which to read images.",
@@ -137,29 +137,30 @@
 		]
 	},
 	"new" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"Create a new **arena**! Generally should be the first command given.",
 			"[1] **Coord** of the **arena**'s bottom-right corner (top-left is *always* A1)."
 		]
 	},
 	"guide" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
-			"Draw a temporary, transparent, shape onto the map.",
-			"[1...] Shape to draw; see **guides** for options & more detail."
+			"Draw a temporary, transparent, shape onto the map; see **guides** for options & more detail.",
+			"[1] Shape to draw",
+			"[2...] **Arguments** for that shape"
 		]
 	},
 	"list" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"Display a breakdown of a/all **team(s)**, and the display & code names of each **group** within them.",
 			"{1} The team to break down.",
 			"^Default: Just lists all teams together."
 		]
 	},
-	"distance" : {
-		"type" : "command",
+	"separation" : {
+		"type" : "commands",
 		"msg" : [
 			"Cacluate the distance between two **coords** or **tokens** (or a combination).",
 			"[1] First coord or token.",
@@ -167,7 +168,7 @@
 		]
 	},
 	"instructions" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"Make the bot print out a list of commands to get back to the current **arena**.",
 			"Note: Mainly useful if you have two arenas you need to flick between",
@@ -175,13 +176,13 @@
 		]
 	},
 	"newgroup" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"Not currently implemented"
 		]
 	},
 	"movegroup" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"Specify **coords** to move (non-**removed**) members of a **group**, in order of **index**.",
 			"[1] **Name** of **group** to move.",
@@ -191,7 +192,7 @@
 		]
 	},
 	"hidegroup" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"Change visibility of an entire **group**.",
 			"[1] **Name** of **group** to edit.",
@@ -200,14 +201,14 @@
 		]
 	},
 	"removegroup" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"Delete an entire **group** from the **arena**.",
 			"[1] **Name** of **group** to remove."
 		]
 	},
 	"resizegroup" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"Change the dimensions of every **token** in a **group**.",
 			"[1] **Name** of **group** to resize.",
@@ -217,7 +218,7 @@
 		]
 	},
 	"newtoken" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"Create new **token**(s) at given **coord**(s).",
 			"[1] **Name** of **group** to add to.",
@@ -228,7 +229,7 @@
 		]
 	},
 	"move" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"Move a single **token** to a given **coord**.",
 			"[1] **Token** to be moved.",
@@ -238,7 +239,7 @@
 		]
 	},
 	"hide" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"Change visibilty of **token**(s) within a **group**.",
 			"[1] **Name** of **group** to edit.",
@@ -249,7 +250,7 @@
 		]
 	},
 	"remove" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"Change removed status of **token**(s) within a **group**.",
 			"[1] **Name** of **group** to edit.",
@@ -260,7 +261,7 @@
 		]
 	},
 	"resize" : {
-		"type" : "command",
+		"type" : "commands",
 		"msg" : [
 			"Change the dimensions of **token**(s) within a **group**.",
 			"[1] **Name** of **group** to edit.",
@@ -286,9 +287,9 @@
 		"type" : "alias",
 		"msg" : "list"
 	},
-	"crow" : {
+	"distance" : {
 		"type" : "alias",
-		"msg" : "distance"
+		"msg" : "separation"
 	},
 	"collapse" : {
 		"type" : "alias",
@@ -309,51 +310,238 @@
 	"groups" : {
 		"type" : "category",
 		"msg" : [
-			"A subset of **commands** to make adding **groups** simpler and easier.\n"
+			"A subset of **commands** focused on creating new **groups**.",
+			"**Arguments** of preset **groups** are all:",
+			"[1] **Team** of **group**.",
+			"[2] **Name** of **group**.",
+			"{3} **CSV** of **ranges** to also create tokens in.",
+			"{4} (true/false) = Created tokens should be (visible/hidden).",
+			"Note: If the first entry in {3} is a **coord**, the dimensions will be set to 1-1",
+			"Note: The dimension of any **coords** in {3} will be set to that of the first entry\n"
 		]
 	},
 	"static" : {
-		"type" : "group",
+		"type" : "groups",
 		"msg" : [
-
+			"An unobtrusive section of background - ideal for large areas of terrain.",
+			"LAYER: 1",
+			"MAIN: GRID",
+			"CELL: RECT"
 		]
 	},
 	"object" : {
-		"type" : "group",
+		"type" : "groups",
 		"msg" : [
-
-		]
-	},
-	"grid" : {
-		"type" : "group",
-		"msg" : [
-
-		]
-	},
-	"creature" : {
-		"type" : "group",
-		"msg" : [
-
+			"A marginally obtrusive section of background - ideal for larger solid objects.",
+			"LAYER: 2",
+			"MAIN: IMAGE",
+			"CELL: RECT"
 		]
 	},
 	"swarm" : {
-		"type" : "group",
+		"type" : "groups",
 		"msg" : [
-
-		]
-	},
-	"concentric" : {
-		"type" : "group",
-		"msg" : [
-
+			"A large group of indistinguisable tokens pushed to the background to be less obtrustive.",
+			"LAYER: 3",
+			"MAIN: SWARM-NAMED",
+			"CELL: ELLIPSE"
 		]
 	},
 	"area" : {
+		"type" : "groups",
+		"msg" : [
+			"An unobtrusive section of midground - ideal for retangular AoE spells/effects.",
+			"LAYER: 4",
+			"MAIN: GRID-NAMED",
+			"CELL: RECT"
+		]
+	},
+	"concentric" : {
+		"type" : "groups",
+		"msg" : [
+			"An double-layered section of midground - ideal for circular AoE spells/effects.",
+			"LAYER: 4",
+			"MAIN: CONCENTRIC-NAMED",
+			"CELL: ELLIPSE"
+		]
+	},
+	"creature" : {
+		"type" : "groups",
+		"msg" : [
+			"Dynamic tokens that should be individual even among similar tokens (ie. to track HP).",
+			"LAYER: -1",
+			"MAIN: IMAGE-NAMED",
+			"CELL: ELLIPSE"
+		]
+	},
+	"custom" : {
+		"type" : "groups",
+		"msg" : [
+			"Mix and match **styles** to tailor your **tokens**' appearances.",
+			"[1] LAYER",
+			"[2] MAIN",
+			"[3] CELL",
+			"[4],[5],{6},{7} **Arguments** of preset **groups**"
+		]
+	},
+	"rectangular" : {
 		"type" : "alias",
-		"msg" : "grid"
+		"msg" : "area"
+	},
+	"circular" : {
+		"type" : "alias",
+		"msg" : "concentric"
+	},
+	"tailor" : {
+		"type" : "alias",
+		"msg" : "custom"
+	},
+	"guides" : {
+		"type" : "category",
+		"msg" : [
+			"A subset of **commands** focused on creating visual previews of movement/large effects/etc.",
+			"Note: These **args** lists start at [2], as [1] was the shape to be drawn\n"
+		]
+	},
+	"box" : {
+		"type" : "guides",
+		"msg" : [
+			"Outline a **range**(s) of cells.",
+			"[2] **CSV** of **Ranges** to be outlined.",
+			"Note: If the first entry in [2] is a **coord**, the dimensions will be set to 1-1",
+			"Note: The dimension of any **coords** in [2] will be set to that of the first entry"
+		]
+	},
+	"line" : {
+		"type" : "guides",
+		"msg" : [
+			"Draw a straight line connecting two cells or tokens.",
+			"[2] **Coord**/**Token** to start from.",
+			"[3] **Coord**/**Token** to end at."
+		]
+	},
+	"ellipse" : {
+		"type" : "guides",
+		"msg" : [
+			"Outline an ellipse of given radii around a **coord** or **token**.",
+			"[2] **Coord**/**Token** at center.",
+			"[3] **Coord** of radii of ellipse (ie. 1-2 makes a small, wide ellipse).",
+			"Note: [3] can be a single number for a circle."
+		]
+	},
+	"equidistant" : {
+		"type" : "guides",
+		"msg" : [
+			"Connect two points with a line, and outline a circle to show equidistant points.",
+			"[2] **Coord**/**Token** at center of circle.",
+			"[3] **Coord**/**Token** to end line at OR Radius of circle."
+		]
+	},
+	"cone" : {
+		"type" : "guides",
+		"msg" : [
+			"Draw a cone originating of given size and angle from a **coord** of origin.",
+			"[2] **Coord**/**Token** to use as origin.",
+			"[3] **Coord** of diameters for the cone (ie. 4-6 makes a 6-wide cone 4 cells from the origin).",
+			"{4} Bearing (clockwise angle from North) of centerline of cone in degrees.",
+			"Note: [3] can be a single number for a standard D&D cone (as wide as it is far away)"
+		]
+	},
+	"spider" : {
+		"type" : "guides",
+		"msg" : [
+			"Draw lines connecting a single point to a list of **coords** or each visible **token** in a **group**.",
+			"[2] **Coord**/**Token** to use as origin.",
+			"[3] **CSV** of **coords** or **name** of **group** to connect draw to."
+		]
+	},
+	"rect" : {
+		"type" : "alias",
+		"msg" : "box"
+	},
+	"square" : {
+		"type" : "alias",
+		"msg" : "rect"
+	},
+	"straight" : {
+		"type" : "alias",
+		"msg" : "line"
 	},
 	"circle" : {
 		"type" : "alias",
-		"msg" : "concentric"
+		"msg" : "ellipse"
+	},
+	"sundail" : {
+		"type" : "alias",
+		"msg" : "equidistant"
+	},
+	"triangle" : {
+		"type" : "alias",
+		"msg" : "cone"
+	},
+	"multiline" : {
+		"type" : "alias",
+		"msg" : "spider"
+	},
+	"styles": {
+		"type" : "category",
+		"msg" : [
+			"__This section is only important if you want to make *custom* **tokens**.__",
+			"The options for how a **group** is drawn onto the **map**.",
+			"There are three customisations for a **group**: LAYER, MAIN, and CELL.",
+			"Tokens are drawn in order of LAYER (low to high, though -1 is *always* drawn on the top).",
+			"MAIN styles dictate the technique to use when drawing the **token**, including how its name is shown",
+			"CELL styles dictate the pattern used *by* the MAIN for each distinct shape.",
+			"Note: You need not include the _main or _cell when making your tokens; that's just for clarity here",
+			"Note: To show a token's name, use Named-[MAIN] or [MAIN]-Named"
+		]
+	},
+	"fill_main" : {
+		"type" : "styles",
+		"msg" : [
+			"Scale a CELL to the **token**'s dimensions and fill it its **team** colour.",
+			"**Name** is displayed in the center of the **token**, in black."
+		]
+	},
+	"grid_main" : {
+		"type" : "styles",
+		"msg" : [
+			"Draw a CELL on each **coord** contained within the **token**'s dimensions.",
+			"**Name** is displayed in the center of the **token**, in white."
+		]
+	},
+	"image_main" : {
+		"type" : "styles",
+		"msg" : [
+			"Search for a matching **image** and scale that to the **token**'s dimensions.",
+			"**Name** is dislayed in the center of the **token**, in its **team** colour.",
+			"Note: If no **image** can be found, this defaults to **fill_main**"
+		]
+	},
+	"swarm_main" : {
+		"type" : "styles",
+		"msg" : [
+			"Draw a CELL on each **coord** contained within the **token**'s dimensions.",
+			"**Name** is displayed atop the four corner cells, in black."
+		]
+	},
+	"concentric_main" : {
+		"type" : "styles",
+		"msg" : [
+			"Draw a CELL at the **token**'s dimensions, then draw another at 3x scale with the first in the center.",
+			"**Name** is displayed in the center of the **token**, in white."
+		]
+	},
+	"rect_cell" : {
+		"type" : "styles",
+		"msg" : [
+			"A filled rectangle that entirely covers the bounds it was draw with."
+		]
+	},
+	"ellipse_cell" : {
+		"type" : "styles",
+		"msg" : [
+			"A filled ellipse entirely contained within the bounds it was drawn with."
+		]
 	}
 }

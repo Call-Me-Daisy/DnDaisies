@@ -110,7 +110,16 @@ function requireGroup(_links, _nameRaw) {
 	return fetchHolder(_links).arena.requireGroup(Case.capital(_nameRaw));
 }
 
-function getTokens(_arena, _command, _start, _need = 1) {
+function fetchTokens(_group, _iCSV) {
+	if (_group.tokens.length === 1) {return [0];}
+	let out = [];
+	for (const i of _iCSV.split(",")) {
+		if (isNaN(i)) {throw `Index ${i} is not a number.`;}
+		out.push(_group.tokens[parseInt(i, 10)]);
+	}
+	return out;
+}
+function fetchTokensVarious(_arena, _command, _start, _need = 1) {
 	let out = [];
 	for (let i=_start; i<_command.length && out.length<_need; i++) {
 		let group = _arena.getGroup(Case.capital(_command[i]));
@@ -120,10 +129,12 @@ function getTokens(_arena, _command, _start, _need = 1) {
 }
 //------------------------------------MODES
 function tokenSwitch(_str, _default = "!") {
-	switch ((_str === undefined) ? _default : _str[0].toLowerCase()) {
-		case "t": return function(_current){return true;}
-		case "f": return function(_current){return false;}
-		case "!": return function(_current){return !_current;}
+	switch ((_str instanceof String) ? _str[0].toLowerCase() : _default) {
+		case "t": return function(_current){return true;};
+		case "f": return function(_current){return false;};
+		case "!": return function(_current){return !_current;};
+
+		default: return tokenSwitch(_default);
 	}
 }
 //------------------------------------PARSING
@@ -214,17 +225,6 @@ class Colour {
 class Case {
 	static capital(_str) {
 		return _str[0].toUpperCase() + _str.slice(1).toLowerCase();
-	}
-}
-class Inds {
-	static parse(_group, _inds) {
-		if (_inds === undefined) {
-			if (group.tokens.length === 1) {return [0];}
-			throw "This group has multiple tokens; either specify indexes or use group function for all.";
-		}
-		let out = [];
-		for (const str of _inds.split(",")) {out.push(parseInt(str, 10));}
-		return out;
 	}
 }
 //--------------------------------------------------------------------DECLUTTERING
@@ -359,16 +359,17 @@ function doLog(_links, _command) {//log [link code]/(->msg_to_log)--log
 //------------------------------------USER
 //------------GENERAL
 const helpHelper = (function(_json){
+	let currentCategory;
 	for (const key in _json) {
 		if (_json.hasOwnProperty(key)) {
 			let el = _json[key];
 			el.aliases = [];
 			switch (el.type) {
-				case "category": _json.categories.msg.push(Case.capital(key)); break;
-				case "keyword": _json.keywords.msg.push(Case.capital(key)); break;
-				case "command": _json.commands.msg.push(Case.capital(key)); break;
-				case "group": _json.groups.msg.push(Case.capital(key)); break;
-				case "guide": _json.guides.msg.push(Case.capital(key)); break;
+				case "category":
+					_json.categories.msg.push(Case.capital(key));
+					currentCategory = key;
+					break;
+				case currentCategory: _json[currentCategory].msg.push(Case.capital(key)); break;
 				case "alias":
 					el.aliases.push(el.msg);
 					for (const alias of _json[el.msg].aliases) {
@@ -459,10 +460,10 @@ function doNewArena(_links, _command) {//new [coord: bottom-right]
 
 const guideHelper = MultiMap.newMap([
 	[["rect", "box", "square"], doRectGuide],
-	[["line", "crow"], doLineGuide],
+	[["line", "straight"], doLineGuide],
 	[["ellipse", "circle"], doEllipseGuide],
-	[["sundail", "distance"], doSundailGuide],
-	[["cone", "tri"], doConeGuide],
+	[["sundail", "equidistant"], doSundailGuide],
+	[["cone", "triangle"], doConeGuide],
 	[["spider", "multiline"], doSpiderGuide]
 ]);
 function doGuide(_links, _command) {//guide ()/[shapeStr] {shapeArgs}
@@ -493,7 +494,7 @@ function doList(_links, _command) {//list
 				if (ls.length > 1) {msg.push(ls.join("\n"));}
 			}
 		}
-		else {msg.push(msgMap.get(COLOURS.get(SHORTCUTS.get(command[1][0].toLowerCase())).join("\n")));}
+		else {msg.push(msgMap.get(Colour.parse(_command[1])).join("\n"));}
 		sendTemp(_links, msg.join("\n\n"));
 	} catch (e) { doFeedback(_links, _command, e); }
 }
@@ -521,16 +522,42 @@ function doNewObjectGroup(_links, _command) {//RED> doNewGroup
 	doNewGroup(_links, _command, {main: PaintStyle.IMAGE, cell: PaintStyle.RECT}, 2);
 }
 function doNewAreaGroup(_links, _command) {//RED> doNewGroup
-	doNewGroup(_links, _command, {main: -PaintStyle.GRID, cell: PaintStyle.RECT}, 3);
+	doNewGroup(_links, _command, {main: -PaintStyle.GRID, cell: PaintStyle.RECT}, 4);
 }
 function doNewConcentricGroup(_links, _command) {//RED> doNewGroup
-	doNewGroup(_links, _command, {main: -PaintStyle.CONCENTRIC, cell: PaintStyle.ELLIPSE}, 3);
+	doNewGroup(_links, _command, {main: -PaintStyle.CONCENTRIC, cell: PaintStyle.ELLIPSE}, 4);
 }
 function doNewSwarmGroup(_links, _command) {//RED> doNewGroup
 	doNewGroup(_links, _command, {main: -PaintStyle.SWARM, cell: PaintStyle.ELLIPSE}, 3);
 }
 function doNewCreatureGroup(_links, _command) {//RED> doNewGroup
 	doNewGroup(_links, _command, {main: -PaintStyle.IMAGE, cell: PaintStyle.ELLIPSE}, -1);
+}
+function doNewCustomGroup(_links, _command) {//RED> doNewGroup
+	let main = (function(_main){
+		let named = (_main.length > 1) ? -1 : 1;
+		return named * (function getMainCode(_i){
+			if (_main[_i][0] !== undefined) {
+				switch(_main[i][0].toLowerCase()) {
+					case "f": return PaintStyle.FILL;
+					case "g": return PaintStyle.GRID;
+					case "i": return PaintStyle.IMAGE;
+					case "s": return PaintStyle.SWARM;
+					case "c": return PaintStyle.CONCETRIC;
+				}
+			}
+			return (named + _i < 0) ? getMainCode(1) : false;
+		})(0);
+	})(_command[2].split("-"));
+	if (!main) {throw `Invalid main style: ${_command[2]}`;}
+	let cell = (function(_cell){
+		switch(_cell) {
+			case "r": return PaintStyle.RECT;
+			case "e": return PaintStyle.ELLIPSE;
+		}
+	})(_command[3]);
+	if (cell === undefined) {throw `Invalid cell style: ${_command[3]}`;}
+	doNewGroup(_links, _command.slice(4), {main: main, cell: cell}, parseInt(_command[1], 10));
 }
 
 function doMoveGroup(_links, _command) {//movegroup [name] [coordCSV] {visible}
@@ -583,7 +610,7 @@ function doNewToken(_links, _command) {//copy [name] [rangeCSV] {visible}
 }
 function doMoveToken(_links, _command) {//move [name] {i} [coord] {visible}
 	try {
-		let token = getTokens(fetchHolder(_links).arena, _command, 1);
+		let token = fetchTokensVarious(fetchHolder(_links).arena, _command, 1);
 		if (token) {
 			try {
 				let coord = Coord.parse(_command[_command.length - 1]);
@@ -607,32 +634,30 @@ function doMoveToken(_links, _command) {//move [name] {i} [coord] {visible}
 function doHideToken(_links, _command) {//hide [name] {iCSV} {mode}
 	try {
 		let group = requireGroup(_links, _command[1]);
-		let mode = tokenSwitch(_command[3], "!");
-		for (const i of Inds.parse(group, _command[2])) {group.tokens[i].visible = mode(group.tokens[i].visible);}
+		let mode = tokenSwitch(_command[_command.length - 1], "!");
+		for (const token of fetchTokens(group, _command[2])) {token.visible = mode(token.visible);}
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doRemoveToken(_links, _command) {//remove [name] {iCSV} {mode} {andGroup}
 	try {
 		let group = requireGroup(_links, _command[1]);
-		let mode = tokenSwitch(_command[3], "t");
-		for (const i of Inds.parse(group, _command[2])) {group.tokens[i].removed = mode(group.tokens[i].removed);}
+		let mode = tokenSwitch(_command[_command.length - 1], "t");
+		for (const token of fetchTokens(group, _command[2])) {token.removed = mode(token.removed);}
 
-		if (_command[4] && _command[4][0].toLowerCase() === "t" && group.isEmpty()) {
-			doRemoveGroup(_command[1]);
-		}
+		if (_command[4] && _command[4][0].toLowerCase() === "t" && group.isEmpty()) {doRemoveGroup(_command[1]);}
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doResizeToken(_links, _command) {//resize [name] {iCSV} [dims]
 	try {
 		let group = requireGroup(_links, _command[1]);
-		let inds = Inds.parse(group, _command[2]);
-		let dims = Coord.parseCSV(_command[3]);
+		let dims = Coord.parseCSV(_command[_command.length - 1]);
+
 		if (dims.length > 1) {
-			for (const [i, dim] of dims.entries()) {group.tokens[inds[i]].setDim(dim);}
+			for (const [i, token] of fetchTokens(group, _command[2]).entries()) {token.setDim(dims[i]);}
 		}
 		else {
 			dims = dims[0];
-			for (const i of inds) {group.tokens[i].setDim(dims);}
+			for (const token of fetchTokens(group, _command[2])) {token.setDim(dims);}
 		}
 	} catch (e) { doFeedback(_links, _command, e); }
 }
@@ -652,14 +677,15 @@ const commandHelper = MultiMap.newMap([
 	[["new", "arena"], doNewArena],
 	[["guide", "preview"], doGuide],
 	[["list", "tokens"], doList],
-	[["distance", "crow"], doDistance],
+	[["distance", "separation"], doDistance],
 	[["instructions", "collapse"], doInstructions],
 	[["static"], doNewStaticGroup],
 	[["object"], doNewObjectGroup],
-	[["grid", "area"], doNewAreaGroup],
-	[["creature"], doNewCreatureGroup],
 	[["swarm"], doNewSwarmGroup],
-	[["circle", "concentric"], doNewConcentricGroup],
+	[["grid", "area"], doNewAreaGroup],
+	[["circular", "concentric"], doNewConcentricGroup],
+	[["creature"], doNewCreatureGroup],
+	[["custom", "tailor"], doNewCustomGroup],
 	[["movegroup"], doMoveGroup],
 	[["hidegroup", "revealgroup"], doHideGroup],
 	[["removegroup"], doRemoveGroup],
