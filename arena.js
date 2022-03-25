@@ -458,14 +458,16 @@ class Arena {
 	}
 
 	removeGroup(_name) {
-		this.groups.delete(_name);
+		return this.groups.delete(_name);
 	}
 	removeToken(_name, _i, _andGroup = false) {
 		let group = this.requireGroup(_name);
 		if (group) {
 			group.tokens[_i].removed = true;
 			if (_andGroup && group.isEmpty()) {this.removeGroup(_name);}
+			return true;
 		}
+		return false;
 	}
 
 	displayGuide() {

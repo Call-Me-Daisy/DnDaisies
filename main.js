@@ -16,7 +16,7 @@ const bot = new Client({intents:[
     Intents.FLAGS.DIRECT_MESSAGE_REACTIONS
 ]});
 
-const allMaps = new Map();
+const allArenas = new Map();
 
 const HELPTIMER = 10000;
 const PREFIX = "--";
@@ -96,10 +96,10 @@ function cleanImg(_holder) {
 }
 //------------------------------------WRAPPERS
 function newHolder(_links) {
-	allMaps.set(_links.c.id, {arena: false, map: false, img: false});
+	allArenas.set(_links.c.id, {arena: false, map: false, img: false});
 }
 function fetchHolder(_links) {
-	return allMaps.get(_links.c.id);
+	return allArenas.get(_links.c.id);
 }
 function ensureHolder(_links) {
 	if (fetchHolder(_links) === undefined) {newHolder(_links);}
@@ -314,7 +314,9 @@ function doNewGroup(_links, _command, _styleCodes, _layer) {//(v) [colour] [name
 		);
 		if (rangeLs) {
 			arena.addToGroup(name, rangeLs, (_command[5] === undefined || _command[5][0].toLowerCase() !== "f"));
+			return true;
 		}
+		return undefined;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 
@@ -350,18 +352,39 @@ function makeInstructions(_links, _holder) {
 	}
 	sendTo(_links, instructions.join("\n"));
 }
+
+async function displayMap(_links, _holder) {
+	cleanMap(_holder);
+
+	let imgUrls = (async function(){
+		if (!_holder.img) {return false;}
+		let out = new Map();
+		for (const [key, msg] of await _holder.img.messages.fetch({limit:100})) {
+			if (msg.attachments.size > 0) {
+				out.set(Case.capital(msg.content), msg.attachemnts.entries().next().value[1].url);
+			}
+		}
+		return out;
+	})();
+
+	_holder.map = await sendTo(_links, {
+		files: [new MessageAttachment(await _holder.arena.buildMap(await imgUrls), _links.c.id + "_map.png")]
+	});
+}
 //------------------------------------ADMIN
 function doQuit(_links, _command) {//quit
-	for (const [id, holder] of allMaps) {
+	for (const [id, holder] of allArenas) {
 		if (_command[1] && _command[1][0].toLowerCase() !== "f") {makeInstructions(_links, holder);}
 
 		cleanMap(holder);
 		cleanImg(holder);
 	}
 	setTimeout(function() {bot.destroy();}, HELPTIMER*1.5);
+	return false;
 }
 function doPing(_links, _command) {//ping
 	sendTo(_links, `pong: ${Date.now()-_links.m.createdTimestamp} ms`);
+	return false;
 }
 function doLog(_links, _command) {//log [link code]/(->msg_to_log)--log
 	let ref = fetchReference(_links.m);
@@ -376,6 +399,7 @@ function doLog(_links, _command) {//log [link code]/(->msg_to_log)--log
 			case "t": console.log(_links.t); break;
 		}
 	}
+	return false;
 }
 //------------------------------------USER
 //------------GENERAL
@@ -415,6 +439,7 @@ const helpHelper = (function(_json){
 })(JSON.parse(fs.readFileSync("./help.json")));
 function doHelp(_links, _command) {//help ()/[command]
 	sendTemp(_links, helpHelper[(_command.length > 1) ? _command[1].toLowerCase() : "categories"].msg);
+	return false;
 }
 async function doImage(_links, _command) {//image ()/(->msg_with_thread)--image
 	try {
@@ -449,33 +474,14 @@ async function doImage(_links, _command) {//image ()/(->msg_with_thread)--image
 			holder.img.setArchived(false);
 			makeTemp(fetchMessage(_links.c.id, holder.img.id).then((_prompt) => {prompt.reply("bump");}));
 		}
-	} catch (e) { doFeedback(_links, _command, e); }
-}
-async function doMap(_links, _command) {//map
-	try {
-		let holder = fetchHolder(_links);
-		cleanMap(holder);
-
-		let imgUrls = async function(){
-			if (!holder.img) {return false;}
-			let out = new Map();
-			for (const [key, msg] of await holder.img.messages.fetch({limit:100})) {
-				if (msg.attachments.size > 0) {
-					out.set(Case.capital(msg.content), msg.attachments.entries().next().value[1].url);
-				}
-			}
-			return out;
-		}();
-
-		holder.map = await sendTo(_links, {
-			files: [new MessageAttachment(await holder.arena.buildMap(await imgUrls), _links.c.id + "_map.png")]
-		})
+		return false;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 //------------ARENA
 function doNewArena(_links, _command) {//new [coord: bottom-right]
 	try {
 		ensureHolder(_links).arena = new Arena(Coord.parse(_command[1]).slice(0,2), sendTemp, _links);
+		return true;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 
@@ -494,7 +500,7 @@ function doGuide(_links, _command) {//guide ()/[shapeStr] {shapeArgs}
 			guideHelper.get(_command[1].toLowerCase())(arena, _command);
 		}
 		arena.displayGuide();
-		doMap(_links, _command);
+		return true;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doList(_links, _command) {//list
@@ -517,6 +523,7 @@ function doList(_links, _command) {//list
 		}
 		else {msg.push(msgMap.get(Colour.parse(_command[1])).join("\n"));}
 		sendTemp(_links, msg.join("\n\n"));
+		return undefined;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doDistance(_links, _command) {//distance ([coord]/[name] {i}) ([coord]/[name] {i})
@@ -528,31 +535,33 @@ function doDistance(_links, _command) {//distance ([coord]/[name] {i}) ([coord]/
 			out += (((coords[1][j]) ? coords[1][j] : 0) - ((coords[0][j]) ? coords[0][j] : 0))**2;
 		}
 		sendTemp(_links, Math.sqrt(out).toString());
+		return undefined;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doInstructions(_links, _command) {//instructions
 	try {
 		makeInstructions(_links, fetchHolder(_links));
+		return undefined;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 //------------GROUP
 function doNewStaticGroup(_links, _command) {//RED> doNewGroup
-	doNewGroup(_links, _command, {main: PaintStyle.GRID, cell: PaintStyle.RECT}, 1);
+	return doNewGroup(_links, _command, {main: PaintStyle.GRID, cell: PaintStyle.RECT}, 1);
 }
 function doNewObjectGroup(_links, _command) {//RED> doNewGroup
-	doNewGroup(_links, _command, {main: PaintStyle.IMAGE, cell: PaintStyle.RECT}, 2);
+	return doNewGroup(_links, _command, {main: PaintStyle.IMAGE, cell: PaintStyle.RECT}, 2);
 }
 function doNewAreaGroup(_links, _command) {//RED> doNewGroup
-	doNewGroup(_links, _command, {main: -PaintStyle.GRID, cell: PaintStyle.RECT}, 4);
+	return doNewGroup(_links, _command, {main: -PaintStyle.GRID, cell: PaintStyle.RECT}, 4);
 }
 function doNewConcentricGroup(_links, _command) {//RED> doNewGroup
-	doNewGroup(_links, _command, {main: -PaintStyle.CONCENTRIC, cell: PaintStyle.ELLIPSE}, 4);
+	return doNewGroup(_links, _command, {main: -PaintStyle.CONCENTRIC, cell: PaintStyle.ELLIPSE}, 4);
 }
 function doNewSwarmGroup(_links, _command) {//RED> doNewGroup
-	doNewGroup(_links, _command, {main: -PaintStyle.SWARM, cell: PaintStyle.ELLIPSE}, 3);
+	return doNewGroup(_links, _command, {main: -PaintStyle.SWARM, cell: PaintStyle.ELLIPSE}, 3);
 }
 function doNewCreatureGroup(_links, _command) {//RED> doNewGroup
-	doNewGroup(_links, _command, {main: -PaintStyle.IMAGE, cell: PaintStyle.ELLIPSE}, -1);
+	return doNewGroup(_links, _command, {main: -PaintStyle.IMAGE, cell: PaintStyle.ELLIPSE}, -1);
 }
 function doNewCustomGroup(_links, _command) {//RED> doNewGroup
 	let main = (function(_main){
@@ -578,7 +587,7 @@ function doNewCustomGroup(_links, _command) {//RED> doNewGroup
 		}
 	})(_command[3]);
 	if (cell === undefined) {throw `Invalid cell style: ${_command[3]}`;}
-	doNewGroup(_links, _command.slice(4), {main: main, cell: cell}, parseInt(_command[1], 10));
+	return doNewGroup(_links, _command.slice(4), {main: main, cell: cell}, parseInt(_command[1], 10));
 }
 
 function doMoveGroup(_links, _command) {//movegroup [name] [rangeCSV] {visible}
@@ -598,17 +607,22 @@ function doMoveGroup(_links, _command) {//movegroup [name] [rangeCSV] {visible}
 				if (mode) {_token.visible = mode(_token.visible);}
 			})(tokens[tokenInd++]);
 		}
+		return true;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doHideGroup(_links, _command) {//hidegroup [name] {mode}
 	try {
 		let mode = boolSwitch(_command[2], "!");
 		for (const token of requireGroup(_links, _command[1]).tokens) {token.visible = mode(token.visible);}
+		return true;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doRemoveGroup(_links, _command) {//removegroup [name]
 	try {
-		fetchHolder(_links).arena.removeGroup(Case.capital(_command[1]));
+		return (function(_groupExisted){
+			if (_groupExisted) {return true;}
+			return undefined;
+		})(fetchHolder(_links).arena.removeGroup(Case.capital(_command[1])));
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doResizeGroup(_links, _command) {//resizegroup [name] [dims] {origin}
@@ -622,6 +636,7 @@ function doResizeGroup(_links, _command) {//resizegroup [name] [dims] {origin}
 			let doResize = getDoResize(_command[3]);
 			for (const token of group.tokens) {doResize(token, group.dim);}
 		}
+		return true;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 //------------TOKEN
@@ -632,6 +647,7 @@ function doNewToken(_links, _command) {//copy [name] [rangeCSV] {visible}
 			Range.parseCSV(_command[2]),
 			(_command[3] === undefined || _command[3][0].toLowerCase() !== "f")
 		);
+		return true;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doMoveToken(_links, _command) {//move [name] {iCSV} [rangeCSV] {visible}
@@ -650,6 +666,7 @@ function doMoveToken(_links, _command) {//move [name] {iCSV} [rangeCSV] {visible
 			if (range[1]) {token.setDim(range[1]);}
 			if (mode) {token.visible = mode(token.visible);}
 		}
+		return true;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doHideToken(_links, _command) {//hide [name] {iCSV} {mode}
@@ -657,6 +674,7 @@ function doHideToken(_links, _command) {//hide [name] {iCSV} {mode}
 		let group = requireGroup(_links, _command[1]);
 		let mode = boolSwitch(_command[_command.length - 1], "!");
 		for (const token of fetchTokens(group, _command[2])) {token.visible = mode(token.visible);}
+		return true;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doRemoveToken(_links, _command) {//remove [name] {iCSV} {mode} {andGroup}
@@ -666,6 +684,7 @@ function doRemoveToken(_links, _command) {//remove [name] {iCSV} {mode} {andGrou
 		for (const token of fetchTokens(group, _command[2])) {token.removed = mode(token.removed);}
 
 		if (_command[4] && _command[4][0].toLowerCase() === "t" && group.isEmpty()) {doRemoveGroup(_command[1]);}
+		return true;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 //--------------------------------------------------------------------TESTING
@@ -680,7 +699,8 @@ const commandHelper = MultiMap.newMap([
 	[["log"], doLog],
 	[["help", "explain"], doHelp],
 	[["image", "thread"], doImage],
-	[["map", "display"], doMap],
+	[["map", "display"], function(_l, _c){return true;}],
+	[["nomap", "hidden"], function(_l, _c){return false;}],
 	[["new", "arena"], doNewArena],
 	[["guide", "preview"], doGuide],
 	[["list", "tokens"], doList],
@@ -703,17 +723,18 @@ const commandHelper = MultiMap.newMap([
 	[["remove"], doRemoveToken]
 ]);
 
-async function mainSwitch(_links, _command) {
+async function mainSwitch(_links, _command, _flags) {
 	if (_command[0].startsWith(PREFIX)) {
 		_command[0] = _command[0].slice(PREFIX.length).toLowerCase()
 		console.log(_command);
 		try {
-			commandHelper.get(_command[0])(_links, _command);
+			(function(_shouldDisplay){
+				if (_flags.display === undefined) {_flags.display = _shouldDisplay;}
+			})(await commandHelper.get(_command[0])(_links, _command));
 		} catch (e) { sendTemp(_links, `Unknown command: ${_command[0]}`); }
-		return true;
+		if (_flags.delete === undefined) {_flags.delete = true;}
 	}
-	if (_command[0].toLowerCase().startsWith("keep")) {return false;}
-	return undefined;
+	if (_command[0].toLowerCase().startsWith("keep")) {_flags.delete = false;}
 }
 
 bot.once("ready", () => {
@@ -721,27 +742,30 @@ bot.once("ready", () => {
 	bot.user.setActivity("Ask me to --explain :D");
 });
 
-bot.on("messageCreate", async (message) => {
-	if (!message.author.bot) {
-		console.log(`#${message.author.discriminator} @${message.channel.id}`);
+bot.on("messageCreate", async (_message) => {
+	if (!_message.author.bot) {
+		console.log(`#${_message.author.discriminator} @${_message.channel.id}`);
 
-		let msg, shouldDelete;
-		if (message.reference !== null && message.content.toLowerCase() === `${PREFIX}parse`) {
-			msg = await fetchReference(message);
-			shouldDelete = (msg.author.id === bot.user.id);
-			message.delete();
-		}
-		else {
-			msg = message;
-			shouldDelete = undefined;
-		}
+		let flags = {};
+		const links = buildLinks(await (function(){
+			if (_message.reference !== null && _message.content.toLowerCase() === `${PREFIX}parse`) {
+				let msg = fetchReference(_message);
+				msg.then((_msg) => { flags.delete = (_msg.author.id === bot.user.id); });
+				_message.delete();
+				return msg;
+			}
+			return _message;
+		})());
 
-		const links = buildLinks(msg);
-		for (const messageLine of msg.content.split("\n")) {
-			let temp = await mainSwitch(links, messageLine.split(" "));
-			if (temp !== undefined && shouldDelete != !temp) {shouldDelete = temp;}
+		for (const messageLine of links.m.content.split("\n")) {
+			await mainSwitch(links, messageLine.split(" "), flags);
 		};
-		if (shouldDelete) {msg.delete().catch((error) => {});}
+		if (flags.display) {
+			(function(_holder){
+				if (_holder && _holder.arena) {console.log("arena"); displayMap(links, _holder);}
+			})(fetchHolder(links));
+		}
+		if (flags.delete) {links.m.delete().catch((error) => {});}
 	}
 });
 //--------------------------------------------------------------------FINALIZE
