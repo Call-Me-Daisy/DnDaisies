@@ -1,4 +1,4 @@
-const { createCanvas, loadImage} = require('canvas')
+const { createCanvas, loadImage} = require("canvas");
 //--------------------------------------------------------------------CONSTANTS
 const MAX_PH = 1920, MAX_PV = 1080;
 const FONT_STR = "px Arial";
@@ -301,11 +301,11 @@ class Token extends Rect {
 	}
 
 	setPos(_pos) {
-		if (_pos.length > 2 && (_pos[2] || _pos[2] === 0)) {this.z = _pos[2];}
-		return super.setPos(_pos[0], _pos[1]);
+		if (_pos.length > 2 && (_pos[2] || _pos[2] === 0)) {this.z = Math.floor(_pos[2]);}
+		return super.setPos(Math.floor(_pos[0]), Math.floor(_pos[1]));
 	}
 	setDim(_dim) {
-		return super.setDim(_dim[0], _dim[1]);
+		return super.setDim(Math.ceil(_dim[0]), Math.ceil(_dim[1]));
 	}
 
 	getPos() {

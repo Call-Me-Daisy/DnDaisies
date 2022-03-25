@@ -213,8 +213,9 @@
 			"Change the dimensions of every **token** in a **group**.",
 			"[1] **Name** of **group** to resize.",
 			"[2] **Coord** of new dimensions (ie. B4 or 2-4 = 2x4 inclusive).",
-			"{3} (true/false) = (Also/Don't) change the group default dimensions.",
-			"^Default: Assumes true."
+			"{3} Current tokens will be scaled out from the: top-left/center-center/bottom-right/etc",
+			"^Default: Current tokens will not be scaled.",
+			"Note: [2] can be a **range**; the position of it will just be ignored"
 		]
 	},
 	"newtoken" : {
@@ -231,18 +232,20 @@
 	"move" : {
 		"type" : "commands",
 		"msg" : [
-			"Move a single **token** to a given **coord**.",
-			"[1] **Token** to be moved.",
-			"[2] **Coord** to move it to.",
-			"{3} (true/false) = Set moved **tokens** to (visible/hidden).",
-			"^Default: **Token** visibilty is unchanged."
+			"Move, and optionally resize, **token**(s) within a **group**.",
+			"[1] **Name** of **group** containing **tokens** to be moved.",
+			"[2] **CSV** of **index** representing all **tokens** to edit.",
+			"[3] **CSV** of **ranges** to move & resize them to - matching the order of [2].",
+			"{4} (true/false/!) = Set moved **tokens** to (visible/hidden/the opposite of the current state).",
+			"^Default: **Token** visibilty is unchanged.",
+			"Note: Any or all entries of [2] can be **coords** to cause the token to be moved *without* resizing"
 		]
 	},
 	"hide" : {
 		"type" : "commands",
 		"msg" : [
 			"Change visibilty of **token**(s) within a **group**.",
-			"[1] **Name** of **group** to edit.",
+			"[1] **Name** of **group** containing **tokens** to be hidden/revealed.",
 			"[2] **CSV** of **index** representing all **tokens** to edit.",
 			"{3} (true/false/!) = Set visibility of **token**(s) to (true/false/the opposite of the current state).",
 			"^Default: Assumes !.",
@@ -253,22 +256,11 @@
 		"type" : "commands",
 		"msg" : [
 			"Change removed status of **token**(s) within a **group**.",
-			"[1] **Name** of **group** to edit.",
+			"[1] **Name** of **group** containing **tokens** to be removed/replaced.",
 			"[2] **CSV** of **index** representing all **tokens** to edit.",
 			"{3} (true/false/!) = **Token**(s) should be (removed/reinstated/the opposite of the current status).",
 			"^Default: Assumes true.",
 			"Note: [2] can be omitted if there is only one **token** in the **group**"
-		]
-	},
-	"resize" : {
-		"type" : "commands",
-		"msg" : [
-			"Change the dimensions of **token**(s) within a **group**.",
-			"[1] **Name** of **group** to edit.",
-			"[2] **CSV** of **index** representing all **tokens** to resize.",
-			"[3] **CSV** of **coords** for new dimensions (ie. B4 or 2-4 = 2x4 inclusive).",
-			"Note: [2] can be omitted if there is only one **token** in the **group**",
-			"Note: If [3] is one variable instead of a CSV, all **tokens** will be set to those dimensions"
 		]
 	},
 	"explain" : {

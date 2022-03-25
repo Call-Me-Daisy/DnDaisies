@@ -111,7 +111,7 @@ function requireGroup(_links, _nameRaw) {
 }
 
 function fetchTokens(_group, _iCSV) {
-	if (_group.tokens.length === 1) {return [0];}
+	if (_group.tokens.length === 1) {return [_group.tokens[0]];}
 	let out = [];
 	for (const i of _iCSV.split(",")) {
 		if (isNaN(i)) {throw `Index ${i} is not a number.`;}
@@ -119,22 +119,43 @@ function fetchTokens(_group, _iCSV) {
 	}
 	return out;
 }
-function fetchTokensVarious(_arena, _command, _start, _need = 1) {
-	let out = [];
-	for (let i=_start; i<_command.length && out.length<_need; i++) {
-		let group = _arena.getGroup(Case.capital(_command[i]));
-		if (group !== undefined) {out.push(group.tokens[(group.tokens.length > 1) ? _command[++i] : 0]);}
-	}
-	return (_need > 1) ? out : out[0];
-}
 //------------------------------------MODES
-function tokenSwitch(_str, _default = "!") {
-	switch ((_str instanceof String) ? _str[0].toLowerCase() : _default) {
+function boolSwitch(_str, _default = "u") {
+	switch ((typeof(_str) === "string") ? _str[0].toLowerCase() : _default) {
 		case "t": return function(_current){return true;};
 		case "f": return function(_current){return false;};
+		case "u": return function(_current){return _current;};
 		case "!": return function(_current){return !_current;};
 
-		default: return tokenSwitch(_default);
+		default: return boolSwitch(_default);
+	}
+}
+function getDoResize(_str, _default = "c") {
+	let origin = (function(_strSplit){
+		if (_strSplit.length > 1) {
+			return [
+				(function(_x){
+					switch (_x[0]) {
+						case "l": return 0;
+						case "r": return 1;
+						default: return 0.5;
+					}
+				})(_strSplit[1]),
+				(function(_y){
+					switch (_y[0]) {
+						case "t": return 0;
+						case "b": return 1;
+						default: return 0.5;
+					}
+				})(_strSplit[0])
+			];
+		}
+		return [0.5, 0.5];
+	})(((typeof(_str) === "string" || _str instanceof String) ? _str.toLowerCase() : _default).split("-"));
+
+	return function(_token, _dim) {
+		_token.setPos([_token.x + origin[0]*(_token.h-_dim[0]), _token.y + origin[1]*(_token.v-_dim[1])]);
+		_token.setDim(_dim);
 	}
 }
 //------------------------------------PARSING
@@ -560,28 +581,28 @@ function doNewCustomGroup(_links, _command) {//RED> doNewGroup
 	doNewGroup(_links, _command.slice(4), {main: main, cell: cell}, parseInt(_command[1], 10));
 }
 
-function doMoveGroup(_links, _command) {//movegroup [name] [coordCSV] {visible}
+function doMoveGroup(_links, _command) {//movegroup [name] [rangeCSV] {visible}
 	try {
 		const tokens = requireGroup(_links, _command[1]).tokens;
-		let numRemoved = 0;
-		let setVisible = function(_boolStr) {
-			if (_boolStr !== undefined) {
-				if (_boolStr[0].toLowerCase() === "t") {return true;}
-				if (_boolStr[0].toLowerCase() === "f") {return false;}
+		let mode = (_command[3] === undefined) ? false : boolSwitch(_command[3], "u");
+
+		let tokenInd = 0;
+		for (const range of Range.parseCSV(_command[2])) {
+			if (tokenInd >= tokens.length) {return;}
+			while (tokens[tokenInd].removed) {
+				if (++tokenInd >= tokens.length) {return;}
 			}
-			return undefined;
-		}(_command[3]);
-		for (const [i, coord] of Coord.parseCSV(_command[2]).entries()) {
-			while (i+numRemoved < tokens.length && tokens[i+numRemoved].removed) {numRemoved++;}
-			if (i + numRemoved >= tokens.length) {return;}
-			tokens[i+numRemoved].setPos(coord);
-			if (setVisible !== undefined) {tokens[i+numRemoved].visible = setVisible;}
+			(function(_token){
+				_token.setPos(range[0]);
+				if (range[1]) {_token.setDim(range[1]);}
+				if (mode) {_token.visible = mode(_token.visible);}
+			})(tokens[tokenInd++]);
 		}
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doHideGroup(_links, _command) {//hidegroup [name] {mode}
 	try {
-		let mode = tokenSwitch(_command[2], "!");
+		let mode = boolSwitch(_command[2], "!");
 		for (const token of requireGroup(_links, _command[1]).tokens) {token.visible = mode(token.visible);}
 	} catch (e) { doFeedback(_links, _command, e); }
 }
@@ -590,12 +611,17 @@ function doRemoveGroup(_links, _command) {//removegroup [name]
 		fetchHolder(_links).arena.removeGroup(Case.capital(_command[1]));
 	} catch (e) { doFeedback(_links, _command, e); }
 }
-function doResizeGroup(_links, _command) {//resizegroup [name] [dims] {andDefault}
+function doResizeGroup(_links, _command) {//resizegroup [name] [dims] {origin}
 	try {
 		let group = requireGroup(_links, _command[1]);
-		let dim = Coord.parse(_command[2]);
-		for (const token of group.tokens) {token.setDim(dim);}
-		if (_command[3] === undefined || _command[3][0].toLowerCase() !== "f") {group.dim = dim;}
+		group.dim = (function(_range){
+			return (_range[1]) ? _range[1] : _range[0].slice(0,2);
+		})(Range.parse(_command[2]));
+
+		if (_command[3] && _command[3][0].toLowerCase() !== "f") {
+			let doResize = getDoResize(_command[3]);
+			for (const token of group.tokens) {doResize(token, group.dim);}
+		}
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 //------------TOKEN
@@ -608,61 +634,42 @@ function doNewToken(_links, _command) {//copy [name] [rangeCSV] {visible}
 		);
 	} catch (e) { doFeedback(_links, _command, e); }
 }
-function doMoveToken(_links, _command) {//move [name] {i} [coord] {visible}
+function doMoveToken(_links, _command) {//move [name] {iCSV} [rangeCSV] {visible}
 	try {
-		let token = fetchTokensVarious(fetchHolder(_links).arena, _command, 1);
-		if (token) {
-			try {
-				let coord = Coord.parse(_command[_command.length - 1]);
-				if (coord[0] === undefined) {throw "";}
-				token.setPos(coord);
-			} catch {
-				token.setPos(Coord.parse(_command[_command.length - 2]));
-				token.visible = (function(_char){
-					switch (_char) {
-						case "t": return true;
-						case "f": return false;
-						case "!": return !token.visible;
+		let group = requireGroup(_links, _command[1]);
+		let [ranges, mode] = (function(_cmd){
+			let out = Range.parseCSV(_cmd);
+			if (out[0][0][0] === undefined) {return [false, boolSwitch(_cmd, "u")];}
+			return [out, false];
+		})(_command[_command.length - 1]);
+		if (!ranges) {ranges = Range.parseCSV(_command[_command.length - 2]);}
 
-						default: return token.visible;
-					}
-				})(_command[_command.length - 1][0].toLowerCase());
-			}
+		for (const [i, token] of fetchTokens(group, _command[2]).entries()) {
+			let range = ranges[i];
+			token.setPos(range[0]);
+			if (range[1]) {token.setDim(range[1]);}
+			if (mode) {token.visible = mode(token.visible);}
 		}
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doHideToken(_links, _command) {//hide [name] {iCSV} {mode}
 	try {
 		let group = requireGroup(_links, _command[1]);
-		let mode = tokenSwitch(_command[_command.length - 1], "!");
+		let mode = boolSwitch(_command[_command.length - 1], "!");
 		for (const token of fetchTokens(group, _command[2])) {token.visible = mode(token.visible);}
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doRemoveToken(_links, _command) {//remove [name] {iCSV} {mode} {andGroup}
 	try {
 		let group = requireGroup(_links, _command[1]);
-		let mode = tokenSwitch(_command[_command.length - 1], "t");
+		let mode = boolSwitch(_command[_command.length - 1], "t");
 		for (const token of fetchTokens(group, _command[2])) {token.removed = mode(token.removed);}
 
 		if (_command[4] && _command[4][0].toLowerCase() === "t" && group.isEmpty()) {doRemoveGroup(_command[1]);}
 	} catch (e) { doFeedback(_links, _command, e); }
 }
-function doResizeToken(_links, _command) {//resize [name] {iCSV} [dims]
-	try {
-		let group = requireGroup(_links, _command[1]);
-		let dims = Coord.parseCSV(_command[_command.length - 1]);
-
-		if (dims.length > 1) {
-			for (const [i, token] of fetchTokens(group, _command[2]).entries()) {token.setDim(dims[i]);}
-		}
-		else {
-			dims = dims[0];
-			for (const token of fetchTokens(group, _command[2])) {token.setDim(dims);}
-		}
-	} catch (e) { doFeedback(_links, _command, e); }
-}
 //--------------------------------------------------------------------TESTING
-async function doTest(_links) {
+async function doTest(_links, _command) {
 
 }
 //--------------------------------------------------------------------MAIN
@@ -693,8 +700,7 @@ const commandHelper = MultiMap.newMap([
 	[["copy", "newtoken"], doNewToken],
 	[["move"], doMoveToken],
 	[["hide", "reveal"], doHideToken],
-	[["remove"], doRemoveToken],
-	[["resize"], doResizeToken]
+	[["remove"], doRemoveToken]
 ]);
 
 async function mainSwitch(_links, _command) {
