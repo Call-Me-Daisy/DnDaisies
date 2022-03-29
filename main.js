@@ -119,6 +119,25 @@ function fetchTokens(_group, _iCSV) {
 	}
 	return out;
 }
+
+async function displayMap(_links, _holder) {
+	cleanMap(_holder);
+
+	let imgUrls = (async function(){
+		if (!_holder.img) {return false;}
+		let out = new Map();
+		for (const [key, msg] of await _holder.img.messages.fetch({limit:100})) {
+			if (msg.attachments.size > 0) {
+				out.set(Case.capital(msg.content), msg.attachemnts.entries().next().value[1].url);
+			}
+		}
+		return out;
+	})();
+
+	_holder.map = await sendTo(_links, {
+		files: [new MessageAttachment(await _holder.arena.buildMap(await imgUrls), _links.c.id + "_map.png")]
+	});
+}
 //------------------------------------MODES
 function boolSwitch(_str, _default = "u") {
 	switch ((typeof(_str) === "string") ? _str[0].toLowerCase() : _default) {
@@ -351,25 +370,6 @@ function makeInstructions(_links, _holder) {
 		instructions.push(`${PREFIX}map`);
 	}
 	sendTo(_links, instructions.join("\n"));
-}
-
-async function displayMap(_links, _holder) {
-	cleanMap(_holder);
-
-	let imgUrls = (async function(){
-		if (!_holder.img) {return false;}
-		let out = new Map();
-		for (const [key, msg] of await _holder.img.messages.fetch({limit:100})) {
-			if (msg.attachments.size > 0) {
-				out.set(Case.capital(msg.content), msg.attachemnts.entries().next().value[1].url);
-			}
-		}
-		return out;
-	})();
-
-	_holder.map = await sendTo(_links, {
-		files: [new MessageAttachment(await _holder.arena.buildMap(await imgUrls), _links.c.id + "_map.png")]
-	});
 }
 //------------------------------------ADMIN
 function doQuit(_links, _command) {//quit
@@ -762,7 +762,7 @@ bot.on("messageCreate", async (_message) => {
 		};
 		if (flags.display) {
 			(function(_holder){
-				if (_holder && _holder.arena) {console.log("arena"); displayMap(links, _holder);}
+				if (_holder && _holder.arena) {displayMap(links, _holder);}
 			})(fetchHolder(links));
 		}
 		if (flags.delete) {links.m.delete().catch((error) => {});}
