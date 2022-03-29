@@ -136,7 +136,7 @@
 			"^Default: A new, empty, thread will be created."
 		]
 	},
-	"map" : {
+	"display" : {
 		"type" : "commands",
 		"msg" : [
 			"Display this channel's map.",
