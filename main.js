@@ -482,7 +482,7 @@ function doNewArena(_links, _command) {//new [coord: bottom-right]
 	try {
 		ensureHolder(_links).arena = new Arena(Coord.parse(_command[1]).slice(0,2), sendTemp, _links);
 		return true;
-	} catch (e) { doFeedback(_links, _command, e); }
+	} catch (e) { throw e; doFeedback(_links, _command, e); }
 }
 
 const guideHelper = MultiMap.newMap([
@@ -731,7 +731,7 @@ async function mainSwitch(_links, _command, _flags) {
 			(function(_shouldDisplay){
 				if (_flags.display === undefined) {_flags.display = _shouldDisplay;}
 			})(await commandHelper.get(_command[0])(_links, _command));
-		} catch (e) { sendTemp(_links, `Unknown command: ${_command[0]}`); }
+		} catch (e) { throw e; sendTemp(_links, `Unknown command: ${_command[0]}`); }
 		if (_flags.delete === undefined) {_flags.delete = true;}
 	}
 	if (_command[0].toLowerCase().startsWith("keep")) {_flags.delete = false;}

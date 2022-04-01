@@ -1,6 +1,48 @@
+//--------------------------------------------------------------------RECT
+class Rect {
+	constructor(_x, _y, _h, _v) {
+		this.setAbs(_x, _y, _h, _v);
+	}
+
+	setAbs(_x, _y, _h, _v) {
+		this.x = (_x > 0) ? _x : 0;
+		this.y = (_y > 0) ? _y : 0;
+		this.h = (_h > 0) ? _h : 1;
+		this.v = (_v > 0) ? _v : 1;
+	}
+	setPos(_x, _y) {
+		this.x = _x;
+		this.y = _y;
+		return this;
+	}
+	setDim(_h, _v) {
+		this.h = _h;
+		this.v = _v;
+		return this;
+	}
+	set(_x, _y, _h, _v) {
+		return this.setPos(_x, _y).setDim(_h, _v);
+	}
+	setFrom(_that) {
+		return this.set(_that.x, _that.y, _that.h, _that.v);
+	}
+
+	shunt(_x, _y) {
+		this.x += _x;
+		this.y += _y;
+		return this;
+	}
+	stretch(_h, _v) {
+		this.h += _h;
+		this.v += _v;
+		return this;
+	}
+
+	centerStretch(_h, _v) {
+		return this.setAbs(this.x + (this.h-_h)/2, this.y + (this.v-_v)/2, _h, _v);
+	}
+}
 //--------------------------------------------------------------------TREEMAP
-//------------------------------------HELP:TREEMAP
-//------------------------------------MAIN:TREEMAP
 class TreeMap extends Map {
 	constructor(_leaves, _branch, _entries) {
 		super();
@@ -34,24 +76,23 @@ class TreeMap extends Map {
 	}
 }
 //--------------------------------------------------------------------MULTIMAP
-//------------------------------------HELP:MULTIMAP
-function doMulti(_map, _entries) {
-	for (const [keyLs, val] of _entries) {
-		for (const key of keyLs) {_map.set(key, val);}
-	}
-	return _map;
-}
-//------------------------------------MAIN:MULTIMAP
 class MultiMap {
+	static doMulti(_map, _entries) {
+		for (const [keyLs, val] of _entries) {
+			for (const key of keyLs) {_map.set(key, val);}
+		}
+		return _map;
+	}
 	static newMap(_entries) {
-		return doMulti(new Map(), _entries);
+		return MultiMap.doMulti(new Map(), _entries);
 	}
 	static newTree(_leaves, _entries) {
-		return doMulti(new TreeMap(_leaves), _entries);
+		return MultiMap.doMulti(new TreeMap(_leaves), _entries);
 	}
 }
 //--------------------------------------------------------------------FINALIZE
 export {
+	Rect,
 	MultiMap,
 	TreeMap
 }

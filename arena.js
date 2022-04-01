@@ -1,7 +1,8 @@
-const { createCanvas, loadImage} = require("canvas");
+const {createCanvas, loadImage} = require("canvas");
+const {Rect} = require("./utils");
+const {BaseLayer, TokenLayer} = require("./map-layer");
 //--------------------------------------------------------------------CONSTANTS
 const MAX_PH = 1920, MAX_PV = 1080;
-const FONT_STR = "px Arial";
 //--------------------------------------------------------------------HELP
 function scaleAlpha(_colStr, _r = 0.5) {
 	return (function(_len){
@@ -16,109 +17,8 @@ function scaleAlpha(_colStr, _r = 0.5) {
 		}
 	})(_colStr.length - 1);
 }
-//------------------------------------RECT
-class Rect {
-	constructor(_x, _y, _h, _v) {
-		this.setAbs(_x, _y, _h, _v);
-	}
-
-	setAbs(_x, _y, _h, _v) {
-		this.x = (_x > 0) ? _x : 0;
-		this.y = (_y > 0) ? _y : 0;
-		this.h = (_h > 0) ? _h : 1;
-		this.v = (_v > 0) ? _v : 1;
-	}
-	setPos(_x, _y) {
-		this.x = _x;
-		this.y = _y;
-		return this;
-	}
-	setDim(_h, _v) {
-		this.h = _h;
-		this.v = _v;
-		return this;
-	}
-	set(_x, _y, _h, _v) {
-		return this.setPos(_x, _y).setDim(_h, _v);
-	}
-	setFrom(_that) {
-		return this.set(_that.x, _that.y, _that.h, _that.v);
-	}
-
-	shunt(_x, _y) {
-		this.x += _x;
-		this.y += _y;
-		return this;
-	}
-	stretch(_h, _v) {
-		this.h += _h;
-		this.v += _v;
-		return this;
-	}
-
-	centerStretch(_h, _v) {
-		return this.setAbs(this.x + (this.h-_h)/2, this.y + (this.v-_v)/2, _h, _v);
-	}
-}
 //--------------------------------------------------------------------MAIN
-//------------------------------------BRUSH
-class Brush extends Rect {
-	constructor(_ctx, _pS, _pM) {
-		super(_pM, _pM, _pS-2*_pM, _pS-2*_pM);
-		this.ctx = _ctx;
-		this.pS = _pS;
-		this.pM = _pM;
-		this.maxFont = 2*(_pS/3-2*_pM);
-	}
-
-	setPos(_x, _y) {
-		return super.setPos(_x*this.pS + this.pM, _y*this.pS + this.pM);
-	}
-	setDim(_h, _v) {
-		return super.setDim(_h*this.pS - 2*this.pM, _v*this.pS - 2*this.pM);
-	}
-
-	shunt(_x, _y) {
-		return super.shunt(_x*this.pS, _y*this.pS);
-	}
-	stretch(_h, _v) {
-		return super.stretch(_h*this.pS, _v*this.pS);
-	}
-
-	clear() {
-		this.ctx.clearRect(this.x, this.y, this.h, this.v);
-	}
-	fillRect() {
-		this.ctx.fillRect(this.x, this.y, this.h, this.v);
-	}
-	fillEllipse() {
-		this.ctx.beginPath();
-		this.ctx.ellipse(this.x + this.h/2, this.y + this.v/2, this.h/2, this.v/2, 0, 0, Math.PI*2);
-		this.ctx.fill();
-	}
-
-	write(_txt) {
-		this.ctx.fillText(_txt, this.x + this.h/2, this.y + this.v/2);
-	}
-	draw(_img) {
-		this.ctx.drawImage(_img, this.x, this.y, this.h, this.v);
-	}
-
-	scaleFont(_r) {
-		this.ctx.font = ((_r > 1) ? 1 : ((_r < 0) ? 0 : _r)*this.maxFont) + FONT_STR;
-	}
-	centerStretch(_r) {
-		super.centerStretch(_r*this.h, _r*this.v);
-	}
-	adjust() {
-		let lw = this.ctx.lineWidth;
-		super.shunt(lw/2, lw/2);
-		return super.stretch(-lw, -lw);
-	}
-	reset() {
-		return this.setAbs(this.pM, this.pM, this.pS-2*this.pM, this.pS-2*this.pM);
-	}
-}
+//------------------------------------STYLES
 class PaintStyle {
 	//------------CELL
 	static RECT = 1;
@@ -278,7 +178,7 @@ class GuideStyle {
 			GuideStyle.line(_brush, _args);
 		}
 	}
-
+	//------------SWITCH
 	static getStyle(_code) {
 		switch(Math.abs(_code)) {
 			case GuideStyle.RECT: return GuideStyle.rect;
@@ -379,25 +279,18 @@ class TokenGroup {
 //------------------------------------ARENA
 class Arena {
 	constructor(_dim, _feedback = console.log, _feedhelp = "USER_ERROR:", _pH = MAX_PH, _pV = MAX_PV) {
-		this.dim = _dim;
 		this.feedhelp = _feedhelp;
 		this.feedback = _feedback; //void function(_feedhelp, string) => tells user what they did wrong
-		let pS = Math.floor(Math.min(_pH/_dim[0], _pV/_dim[1]));
-		let pM = Math.ceil(pS/64);
 
-		this.canvas = createCanvas((2+_dim[0])*pS, (2+_dim[1])*pS);
-		this.groups = new Map();
-		this.topLayer = 0;
+		this.layers = (function(_pS){
+			return {
+				base: new BaseLayer(_dim, _pS),
+				token: new TokenLayer(_dim, _pS)
+			};
+		})(Math.floor(Math.min(_pH/_dim[0], _pV/_dim[1])));
+
 		this.newGroup({main: PaintStyle.IMAGE, cell: PaintStyle.RECT}, 0, "Background", "#000", _dim);
 		this.addToGroupSplit("Background", [1,1,0]);
-
-		this.brush = new Brush(this.canvas.getContext("2d"), pS, pM);
-		this.brush.ctx.textAlign = "center";
-		this.brush.ctx.textBaseline = "middle";
-		this.brush.ctx.strokeStyle = "#3579";
-		this.brush.ctx.lineWidth = pS;
-
-		this.guide = {display: false};
 	}
 
 	userFeedback(_str) {
@@ -405,7 +298,7 @@ class Arena {
 	}
 
 	getGroup(_name) {
-		return this.groups.get(_name);
+		return this.layers.token.groups.get(_name);
 	}
 	requireGroup(_name) {
 		let group = this.getGroup(_name);
@@ -448,9 +341,9 @@ class Arena {
 		}
 	}
 	newGroup(_styleCodes, _layer, _name, _colour, _dim = [1,1], _override = false) {
-		if (_override || this.groups.get(_name) === undefined) {
-			this.groups.set(_name, new TokenGroup(_name, _dim, _styleCodes, _colour, _layer));
-			if (_layer > this.topLayer) {this.topLayer = _layer;}
+		if (_override || this.layers.token.groups.get(_name) === undefined) {
+			this.layers.token.groups.set(_name, new TokenGroup(_name, _dim, _styleCodes, _colour, _layer));
+			if (_layer > this.layers.token.topLayer) {this.layers.token.topLayer = _layer;}
 		}
 		else {
 			this.userFeedback(`Group ${_name} already exists; allow override or use alternate name.`);
@@ -458,7 +351,7 @@ class Arena {
 	}
 
 	removeGroup(_name) {
-		return this.groups.delete(_name);
+		return this.layers.token.groups.delete(_name);
 	}
 	removeToken(_name, _i, _andGroup = false) {
 		let group = this.requireGroup(_name);
@@ -471,53 +364,24 @@ class Arena {
 	}
 
 	displayGuide() {
-		this.guide.display = true;
+		this.layers.token.guide.display = true;
 	}
 	setGuide(_shapeCode, _shapeArgs) {
-		this.guide.shape = GuideStyle.getStyle(_shapeCode);
-		this.guide.args = _shapeArgs;
+		this.layers.token.guide.shape = GuideStyle.getStyle(_shapeCode);
+		this.layers.token.guide.args = _shapeArgs;
 	}
 
-	async prepMap() {
-		this.brush.scaleFont(1);
-		this.brush.ctx.fillStyle = "#000";
-		this.brush.setAbs(0, 0, this.canvas.width, this.canvas.height)
-		this.brush.fillRect();
-
-		this.brush.ctx.fillStyle = "#fff";
-		this.brush.reset();
-		for (const h of [0, this.dim[0]+1]) {
-			for (let v = 1; v <= this.dim[1]; v++) {
-				this.brush.setPos(h,v).write(String.fromCharCode(v + ((v > 26) ? 70 : 64)));
-			}
-		}
-		for (const v of [0, this.dim[1]+1]) {
-			for (let h = 1; h <= this.dim[0]; h++) {this.brush.setPos(h,v).write(h.toString());}
-		}
-		this.brush.scaleFont(0.75);
-	}
-	async drawGuide() {
-		if (this.guide.display) {
-			this.guide.shape(this.brush, this.guide.args);
-			this.guide.display = false;
-		}
-	}
 	async buildMap(_imgUrls) {
-		this.prepMap();
-
-		let layers = [];
-		for (let i=0; i<=this.topLayer+1; i++) {layers.push(new Map());}
-		for (const [name, group] of this.groups) {
-			layers[(group.layer !== -1) ? group.layer : this.topLayer+1].set(name, group);
-		}
-		for (const layer of layers) {
-			for (const [name, group] of layer) {
-				await group.paintAll(this.brush, await _imgUrls, name);
+		let ctx;
+		for (const [key, layer] of Object.entries(this.layers)) {
+			if (ctx) {ctx.drawImage(await layer.getCanvas(_imgUrls), 0, 0);}
+			else {
+				await layer.paint();
+				ctx = layer.brush.ctx;
 			}
 		}
 
-		await this.drawGuide();
-		return this.canvas.toBuffer("image/png");
+		return ctx.canvas.toBuffer("image/png");
 	}
 }
 //--------------------------------------------------------------------FINALIZE
