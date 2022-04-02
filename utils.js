@@ -1,41 +1,53 @@
 //--------------------------------------------------------------------RECT
 class Rect {
 	constructor(_x, _y, _h, _v) {
+		this.x = 0;
+		this.y = 0;
+		this.h = 0;
+		this.v = 0;
 		this.setAbs(_x, _y, _h, _v);
 	}
 
 	setAbs(_x, _y, _h, _v) {
-		this.x = (_x > 0) ? _x : 0;
-		this.y = (_y > 0) ? _y : 0;
-		this.h = (_h > 0) ? _h : 1;
-		this.v = (_v > 0) ? _v : 1;
-	}
-	setPos(_x, _y) {
-		this.x = _x;
-		this.y = _y;
+		if (_x >= 0) {this.x = _x;}
+		if (_y >= 0) {this.y = _y;}
+		if (_h >= 1) {this.h = _h;}
+		if (_v >= 1) {this.v = _v;}
 		return this;
+	}
+	alterAbs(_dx, _dy, _dh, _dv) {
+		let x = (_dx) ? this.x + _dx : -1;
+		let y = (_dy) ? this.y + _dy : -1;
+		let h = (_dh) ? this.h + _dh : -1;
+		let v = (_dv) ? this.v + _dv : -1;
+		return this.setAbs(x, y, h, v);
+	}
+
+	setPos(_x, _y) {
+		return this.setAbs(_x, _y, -1, -1);
 	}
 	setDim(_h, _v) {
-		this.h = _h;
-		this.v = _v;
-		return this;
+		return this.setAbs(-1, -1, _h, _v);
 	}
+	alterPos(_dx, _dy) {
+		return this.alterAbs(_dx, _dy, false, false);
+	}
+	alterDim(_dh, _dv) {
+		return this.alterAbs(false, false, _dh, _dv);
+	}
+
 	set(_x, _y, _h, _v) {
 		return this.setPos(_x, _y).setDim(_h, _v);
 	}
+	alter(_dx, _dy, _dh, _dv) {
+		return this.alterPos(_dx, _dy).alterDim(_dh, _dv);
+	}
+
 	setFrom(_that) {
 		return this.set(_that.x, _that.y, _that.h, _that.v);
 	}
-
-	shunt(_x, _y) {
-		this.x += _x;
-		this.y += _y;
-		return this;
-	}
-	stretch(_h, _v) {
-		this.h += _h;
-		this.v += _v;
-		return this;
+	alterBy(_that) {
+		return this.alter(_that.x, _that.y, _that.h, _that.v);
 	}
 
 	centerStretch(_h, _v) {

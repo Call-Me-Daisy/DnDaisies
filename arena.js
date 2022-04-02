@@ -1,6 +1,6 @@
 const {createCanvas, loadImage} = require("canvas");
 const {Rect} = require("./utils");
-const {BaseLayer, TokenLayer} = require("./map-layer");
+const {BaseLayer, TokenLayer, LightLayer} = require("./map-layer");
 //--------------------------------------------------------------------CONSTANTS
 const MAX_PH = 1920, MAX_PV = 1080;
 //--------------------------------------------------------------------HELP
@@ -160,7 +160,7 @@ class GuideStyle {
 		let dr0 = [_brush.h*s, _brush.h*-c];
 		let dr1 = [(_brush.v - _brush.ctx.lineWidth/2)*c/2, (_brush.v - _brush.ctx.lineWidth/2)*s/2];
 
-		_brush.shunt(s,-c);
+		_brush.alterPos(s,-c);
 
 		_brush.ctx.beginPath();
 		_brush.ctx.moveTo(_brush.x, _brush.y);
@@ -285,12 +285,18 @@ class Arena {
 		this.layers = (function(_pS){
 			return {
 				base: new BaseLayer(_dim, _pS),
-				token: new TokenLayer(_dim, _pS)
+				token: new TokenLayer(_dim, _pS),
+				light: new LightLayer(_dim, _pS, 0.7)
 			};
 		})(Math.floor(Math.min(_pH/_dim[0], _pV/_dim[1])));
 
 		this.newGroup({main: PaintStyle.IMAGE, cell: PaintStyle.RECT}, 0, "Background", "#000", _dim);
 		this.addToGroupSplit("Background", [1,1,0]);
+
+		this.layers.light.sinks.set("testSingle", [{x:5,y:5,r:2,a:1,f:.9}]);
+		this.layers.light.sinks.set("testOverlap", [{x:7,y:10,r:2,a:.9,f:.9}]);
+		this.layers.light.sources.set("testSingle", [{x:10,y:5,r:2,a:1,f:0}]);
+		this.layers.light.sources.set("testOverlap", [{x:8,y:10,r:2,a:.9}]);
 	}
 
 	userFeedback(_str) {
@@ -373,11 +379,20 @@ class Arena {
 
 	async buildMap(_imgUrls) {
 		let ctx;
+		let overlay = new Rect();
 		for (const [key, layer] of Object.entries(this.layers)) {
-			if (ctx) {ctx.drawImage(await layer.getCanvas(_imgUrls), 0, 0);}
+			if (ctx) {
+				ctx.drawImage(
+					await layer.getCanvas(_imgUrls),
+					overlay.x, overlay.y, overlay.h, overlay.v,
+					overlay.x, overlay.y, overlay.h, overlay.v
+				);
+			}
 			else {
 				await layer.paint();
 				ctx = layer.brush.ctx;
+				layer.brush.setFrom(layer);
+				overlay.setFrom(layer.brush);
 			}
 		}
 

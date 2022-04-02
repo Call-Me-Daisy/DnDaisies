@@ -18,12 +18,23 @@ class Brush extends Rect {
 	setDim(_h, _v) {
 		return super.setDim(_h*this.pS - 2*this.pM, _v*this.pS - 2*this.pM);
 	}
-
-	shunt(_x, _y) {
-		return super.shunt(_x*this.pS, _y*this.pS);
+	alterPos(_x, _y) {
+		return super.alterPos(_x*this.pS, _y*this.pS);
 	}
-	stretch(_h, _v) {
-		return super.stretch(_h*this.pS, _v*this.pS);
+	alterDim(_h, _v) {
+		return super.alterDim(_h*this.pS, _v*this.pS);
+	}
+
+	centerStretch(_r) {
+		super.centerStretch(_r*this.h, _r*this.v);
+	}
+	adjust() {
+		let lw = this.ctx.lineWidth;
+		super.alterPos(lw/2, lw/2);
+		return super.alterDim(-lw, -lw);
+	}
+	reset() {
+		return this.setAbs(this.pM, this.pM, this.pS-2*this.pM, this.pS-2*this.pM);
 	}
 
 	clear() {
@@ -48,24 +59,13 @@ class Brush extends Rect {
 	scaleFont(_r) {
 		this.ctx.font = ((_r > 1) ? 1 : ((_r < 0) ? 0 : _r)*this.maxFont) + FONT_STR;
 	}
-	centerStretch(_r) {
-		super.centerStretch(_r*this.h, _r*this.v);
-	}
-	adjust() {
-		let lw = this.ctx.lineWidth;
-		super.shunt(lw/2, lw/2);
-		return super.stretch(-lw, -lw);
-	}
-	reset() {
-		return this.setAbs(this.pM, this.pM, this.pS-2*this.pM, this.pS-2*this.pM);
-	}
 }
 //--------------------------------------------------------------------MAIN
-class MapLayer {
+class MapLayer extends Rect {
 	constructor(_dim, _pS, _pM) {
-		[this.h, this.v] = _dim;
+		super(1, 1, _dim[0], _dim[1]);
 		this.canvas = createCanvas(_pS*(2+this.h), _pS*(2+this.v));
-		this.brush = new Brush(this.canvas.getContext("2d"), _pS, (_pM) ? _pM : Math.ceil(_pS/64));
+		this.brush = new Brush(this.canvas.getContext("2d"), _pS, (_pM !== undefined) ? _pM : Math.ceil(_pS/64));
 		this.brush.ctx.textAlign = "center";
 		this.brush.ctx.textBaseline = "middle";
 	}
@@ -136,9 +136,57 @@ class TokenLayer extends MapLayer {
 		await this.drawGuide();
 	}
 }
+//------------------------------------LIGHT
+class LightLayer extends MapLayer {
+	static makeShadowMaker(_hue) {
+		let base = "rgba(" + _hue.join(",") + ",";
+		return function(_alpha) {
+			return base + _alpha + ")";
+		};
+	}
+	static trans = "rgba(0,0,0,0)";
+
+	constructor(_dim, _pS, _ambient, _shadowHue = [0,0,0]) {
+		super(_dim, _pS, 0);
+		this.makeShadow = LightLayer.makeShadowMaker(_shadowHue);
+		this.ambient = this.makeShadow(_ambient);
+		this.sources = new Map();
+		this.sinks = new Map();
+	}
+
+	paintLight(_x, _y, _r, _a, _startFade = 0.5) {
+		let shadow = this.makeShadow(_a);
+		this.brush.set(_x, _y, _r, _r).alterPos(.5, .5);
+		(function(_ctx, _px, _py, _pr) {
+			let g = _ctx.createRadialGradient(_px, _py, 0, _px, _py, _pr);
+			g.addColorStop(0, shadow);
+			if (_startFade > 0) {g.addColorStop(_startFade, shadow);}
+			g.addColorStop(1, LightLayer.trans);
+
+			_ctx.fillStyle = g;
+		})(this.brush.ctx, this.brush.x, this.brush.y, this.brush.h);
+		this.brush.alterPos(-_r/2, -_r/2);
+		this.brush.centerStretch(2);
+		this.brush.fillRect();
+	}
+	async paint(_helper) {
+		this.brush.ctx.globalCompositeOperation = "source-over";
+		this.brush.ctx.fillStyle = this.ambient;
+		this.brush.setFrom(this).fillRect();
+		for (const [name, group] of this.sinks) {
+			for (const light of group) {this.paintLight(light.x, light.y, light.r, light.a, light.f);}
+		}
+		this.brush.ctx.globalCompositeOperation = "destination-out";
+
+		for (const [name, group] of this.sources) {
+			for (const light of group) {this.paintLight(light.x, light.y, light.r, light.a, light.f);}
+		}
+	}
+}
 //--------------------------------------------------------------------FINALIZE
 export {
 	MapLayer,
 	BaseLayer,
-	TokenLayer
+	TokenLayer,
+	LightLayer
 }
