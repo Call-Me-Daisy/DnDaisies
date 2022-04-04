@@ -70,12 +70,14 @@ class MapLayer extends Rect {
 		this.brush.ctx.textBaseline = "middle";
 	}
 
-	async paint(_helper) {
-		throw "MapLayer.paint is Not Implimented and should be overriden in child class.";
+	clearCanvas() {
+		this.brush.setFrom(this);
+		this.brush.clear();
 	}
-	async getCanvas(_helper) {
+	async getCanvas() {
 		//if _some_update_flag_
-		await this.paint(_helper);
+		this.clearCanvas();
+		await this.paint(...arguments);
 		//endif
 		return this.canvas;
 	}
@@ -91,6 +93,7 @@ class BaseLayer extends MapLayer {
 		this.brush.ctx.fillStyle = "#000";
 		this.brush.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+		this.brush.reset();
 		this.brush.ctx.fillStyle = "#fff";
 		for (const h of [0, this.h + 1]) {
 			for (let v = 1; v <= this.v; v++) {
@@ -107,25 +110,15 @@ class TokenLayer extends MapLayer {
 	constructor(_dim, _pS, _pM) {
 		super(_dim, _pS, _pM);
 		this.brush.scaleFont(0.75);
-		this.brush.ctx.strokeStyle = "#3579";
-		this.brush.ctx.lineWidth = _pS;
 
-		this.groups = new Map();
 		this.topLayer = 0;
-		this.guide = {display: false};
 	}
 
-	async drawGuide() {
-		if (this.guide.display) {
-			this.guide.shape(this.brush, this.guide.args);
-			this.guide.display = false;
-		}
-	}
-	async paint(_imgUrls) {
+	async paint(_groups, _imgUrls) {
 		this.brush.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 		let layers = [];
 		for (let i=0; i<=this.topLayer+1; i++) {layers.push(new Map());}
-		for (const [name, group] of this.groups) {
+		for (const [name, group] of _groups.entries()) {
 			layers[(group.layer !== -1) ? group.layer : this.topLayer+1].set(name, group);
 		}
 		for (const layer of layers) {
@@ -133,7 +126,25 @@ class TokenLayer extends MapLayer {
 				await group.paintAll(this.brush, await _imgUrls, name);
 			}
 		}
-		await this.drawGuide();
+	}
+}
+//------------------------------------GUIDE
+class GuideLayer extends MapLayer {
+	constructor(_dim, _pS, _pM, _stroke = "#3579") {
+		super(_dim, _pS, _pM);
+		this.brush.ctx.strokeStyle = _stroke;
+		this.brush.ctx.lineWidth = _pS;
+
+		this.display = false;
+		this.shapes = [];
+	}
+
+	async paint() {
+		if (this.display) {
+			for (const shape of this.shapes) {await shape.draw(this.brush, shape.args);}
+			this.shapes = [];
+			this.display = false;
+		}
 	}
 }
 //------------------------------------LIGHT
@@ -188,5 +199,6 @@ export {
 	MapLayer,
 	BaseLayer,
 	TokenLayer,
+	GuideLayer,
 	LightLayer
 }

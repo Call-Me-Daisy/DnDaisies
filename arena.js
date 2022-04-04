@@ -1,6 +1,6 @@
 const {createCanvas, loadImage} = require("canvas");
 const {Rect} = require("./utils");
-const {BaseLayer, TokenLayer, LightLayer} = require("./map-layer");
+const {BaseLayer, TokenLayer, GuideLayer, LightLayer} = require("./map-layer");
 //--------------------------------------------------------------------CONSTANTS
 const MAX_PH = 1920, MAX_PV = 1080;
 //--------------------------------------------------------------------HELP
@@ -282,13 +282,16 @@ class Arena {
 		this.feedhelp = _feedhelp;
 		this.feedback = _feedback; //void function(_feedhelp, string) => tells user what they did wrong
 
+		this.groups = new Map();
+
+		this.base = new BaseLayer(_dim, Math.floor(Math.min(_pH/_dim[0], _pV/_dim[1])));
 		this.layers = (function(_pS){
 			return {
-				base: new BaseLayer(_dim, _pS),
 				token: new TokenLayer(_dim, _pS),
-				light: new LightLayer(_dim, _pS, 0.7)
+				light: new LightLayer(_dim, _pS, 0.5),
+				guide: new GuideLayer(_dim, _pS)
 			};
-		})(Math.floor(Math.min(_pH/_dim[0], _pV/_dim[1])));
+		})(this.base.brush.pS)
 
 		this.newGroup({main: PaintStyle.IMAGE, cell: PaintStyle.RECT}, 0, "Background", "#000", _dim);
 		this.addToGroupSplit("Background", [1,1,0]);
@@ -304,7 +307,7 @@ class Arena {
 	}
 
 	getGroup(_name) {
-		return this.layers.token.groups.get(_name);
+		return this.groups.get(_name);
 	}
 	requireGroup(_name) {
 		let group = this.getGroup(_name);
@@ -347,8 +350,8 @@ class Arena {
 		}
 	}
 	newGroup(_styleCodes, _layer, _name, _colour, _dim = [1,1], _override = false) {
-		if (_override || this.layers.token.groups.get(_name) === undefined) {
-			this.layers.token.groups.set(_name, new TokenGroup(_name, _dim, _styleCodes, _colour, _layer));
+		if (_override || this.groups.get(_name) === undefined) {
+			this.groups.set(_name, new TokenGroup(_name, _dim, _styleCodes, _colour, _layer));
 			if (_layer > this.layers.token.topLayer) {this.layers.token.topLayer = _layer;}
 		}
 		else {
@@ -357,7 +360,7 @@ class Arena {
 	}
 
 	removeGroup(_name) {
-		return this.layers.token.groups.delete(_name);
+		return this.groups.delete(_name);
 	}
 	removeToken(_name, _i, _andGroup = false) {
 		let group = this.requireGroup(_name);
@@ -370,30 +373,28 @@ class Arena {
 	}
 
 	displayGuide() {
-		this.layers.token.guide.display = true;
+		this.layers.guide.display = true;
 	}
 	setGuide(_shapeCode, _shapeArgs) {
-		this.layers.token.guide.shape = GuideStyle.getStyle(_shapeCode);
-		this.layers.token.guide.args = _shapeArgs;
+		this.layers.guide.shapes.push({
+			draw: GuideStyle.getStyle(_shapeCode),
+			args: _shapeArgs
+		});
+		this.layers.guide.display = true;
 	}
 
 	async buildMap(_imgUrls) {
-		let ctx;
-		let overlay = new Rect();
+		await this.base.paint();
+
+		let ctx = this.base.brush.ctx;
+		let paintArea = new Rect().setFrom(this.base.brush.setFrom(this.base));
+
 		for (const [key, layer] of Object.entries(this.layers)) {
-			if (ctx) {
-				ctx.drawImage(
-					await layer.getCanvas(_imgUrls),
-					overlay.x, overlay.y, overlay.h, overlay.v,
-					overlay.x, overlay.y, overlay.h, overlay.v
-				);
-			}
-			else {
-				await layer.paint();
-				ctx = layer.brush.ctx;
-				layer.brush.setFrom(layer);
-				overlay.setFrom(layer.brush);
-			}
+			ctx.drawImage(
+				await layer.getCanvas(this.groups, _imgUrls),
+				paintArea.x, paintArea.y, paintArea.h, paintArea.v,
+				paintArea.x, paintArea.y, paintArea.h, paintArea.v
+			);
 		}
 
 		return ctx.canvas.toBuffer("image/png");
