@@ -688,6 +688,41 @@ function doRemoveToken(_links, _command) {//remove [name] {iCSV} {mode} {andGrou
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 //--------------------------------------------------------------------TESTING
+function doEditGroupLight(_links, _command) {
+	try {
+		let group = requireGroup(_links, _command[1]);
+
+		group.radius = parseFloat(_command[2], 10);
+		group.opacity = parseFloat(_command[3], 10);
+		group.startFade = parseFloat(_command[4], 10);
+
+		return true;
+	} catch (e) {throw e; doFeedback(_links, _command, e); }
+}
+function doEditAmbientLight(_links, _command) {
+	try {
+		let layer = fetchHolder(_links, _command).arena.layers.light;
+		let rgba = [];
+		for (const cmd of _command.slice(1)) {
+			rgba.push(...(function(_cmdSplit){
+				let out = [];
+				for (const val of _cmdSplit) {out.push(parseFloat(val, 10).toFixed(2));}
+				return out;
+			})(cmd.split(",")));
+		}
+		switch (rgba.length) {
+			case 1: layer.ambientOpacity = rgba[0]; break;
+			case 3: layer.makeShadow = LightLayer.makeMakeShadow(rgba); break;
+			case 4:
+				layer.makeShadow = LightLayer.makeMakeShadow(rgba.slice(0,3));
+				layer.ambientOpacity = rgba[4];
+				break;
+
+			default: throw `doEditAmbientLight cannot take ${rgba.length} arguments.`
+		}
+		return true;
+	} catch (e) {throw e; doFeedback(_links, _command, e); }
+}
 async function doTest(_links, _command) {
 
 }
@@ -720,7 +755,9 @@ const commandHelper = MultiMap.newMap([
 	[["copy", "newtoken"], doNewToken],
 	[["move"], doMoveToken],
 	[["hide", "reveal"], doHideToken],
-	[["remove"], doRemoveToken]
+	[["remove"], doRemoveToken],
+	[["light", "dark"], doEditGroupLight],
+	[["ambient"], doEditAmbientLight]
 ]);
 
 async function mainSwitch(_links, _command, _flags) {

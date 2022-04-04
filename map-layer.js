@@ -26,7 +26,7 @@ class Brush extends Rect {
 	}
 
 	centerStretch(_r) {
-		super.centerStretch(_r*this.h, _r*this.v);
+		return super.centerStretch(_r*this.h, _r*this.v);
 	}
 	adjust() {
 		let lw = this.ctx.lineWidth;
@@ -150,19 +150,19 @@ class GuideLayer extends MapLayer {
 //------------------------------------LIGHT
 class LightLayer extends MapLayer {
 	static makeShadowMaker(_hue) {
-		let base = "rgba(" + _hue.join(",") + ",";
-		return function(_alpha) {
-			return base + _alpha + ")";
+		let rgb = [];
+		for (const x of _hue) {rgb.push((x < 0) ? 0 : ((x > 255) ? 255 : Math.floor(x)));}
+		const base = "rgba(" + rgb.join(",") + ",";
+		return function(_a) {
+			return base + ((_a < 0) ? 0 : ((_a > 1) ? 1 : _a)) + ")";
 		};
 	}
 	static trans = "rgba(0,0,0,0)";
 
-	constructor(_dim, _pS, _ambient, _shadowHue = [0,0,0]) {
+	constructor(_dim, _pS, _ambientOpacity, _shadowHue = [0,0,0]) {
 		super(_dim, _pS, 0);
 		this.makeShadow = LightLayer.makeShadowMaker(_shadowHue);
-		this.ambient = this.makeShadow(_ambient);
-		this.sources = new Map();
-		this.sinks = new Map();
+		this.ambientOpacity = _ambientOpacity;
 	}
 
 	paintLight(_x, _y, _r, _a, _startFade = 0.5) {
@@ -180,17 +180,21 @@ class LightLayer extends MapLayer {
 		this.brush.centerStretch(2);
 		this.brush.fillRect();
 	}
-	async paint(_helper) {
+	async paint(_groups) {
 		this.brush.ctx.globalCompositeOperation = "source-over";
-		this.brush.ctx.fillStyle = this.ambient;
+		this.brush.ctx.fillStyle = this.makeShadow(this.ambientOpacity);
 		this.brush.setFrom(this).fillRect();
-		for (const [name, group] of this.sinks) {
-			for (const light of group) {this.paintLight(light.x, light.y, light.r, light.a, light.f);}
+		for (const [name, group] of _groups.entries()) {
+			if (group.opacity && group.opacity > this.ambientOpacity) {
+				group.lightAll(this.brush, this.makeShadow, false);
+			}
 		}
-		this.brush.ctx.globalCompositeOperation = "destination-out";
 
-		for (const [name, group] of this.sources) {
-			for (const light of group) {this.paintLight(light.x, light.y, light.r, light.a, light.f);}
+		this.brush.ctx.globalCompositeOperation = "destination-out";
+		for (const [name, group] of _groups.entries()) {
+			if (group.opacity && group.opacity < this.ambientOpacity) {
+				group.lightAll(this.brush, this.makeShadow, true);
+			}
 		}
 	}
 }

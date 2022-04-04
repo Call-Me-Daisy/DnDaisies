@@ -275,6 +275,23 @@ class TokenGroup {
 			}
 		}
 	}
+	async lightAll(_brush, _makeShadow, _invert) {
+		let shadow = _makeShadow((_invert) ? 1 - this.opacity : this.opacity);
+		console.log(`Called: ${this.code} => ` + shadow, this.radius, this.startFade);
+		for (const token of this.tokens) {
+			_brush.set(token.x, token.y, this.radius, this.radius).alterPos(.5, .5);
+			(function(_ctx, _px, _py, _pr, _f) {
+				let g = _ctx.createRadialGradient(_px, _py, 0, _px, _py, _pr);
+				g.addColorStop(0, shadow);
+				if (_f > 0) {g.addColorStop(_f, shadow);}
+				g.addColorStop(1, LightLayer.trans);
+				_ctx.fillStyle = g;
+			})(_brush.ctx, _brush.x, _brush.y, _brush.h, this.startFade);
+			_brush.alterPos(-this.radius/2, -this.radius/2);
+			_brush.centerStretch(2);
+			_brush.fillRect();
+		}
+	}
 }
 //------------------------------------ARENA
 class Arena {
@@ -295,11 +312,6 @@ class Arena {
 
 		this.newGroup({main: PaintStyle.IMAGE, cell: PaintStyle.RECT}, 0, "Background", "#000", _dim);
 		this.addToGroupSplit("Background", [1,1,0]);
-
-		this.layers.light.sinks.set("testSingle", [{x:5,y:5,r:2,a:1,f:.9}]);
-		this.layers.light.sinks.set("testOverlap", [{x:7,y:10,r:2,a:.9,f:.9}]);
-		this.layers.light.sources.set("testSingle", [{x:10,y:5,r:2,a:1,f:0}]);
-		this.layers.light.sources.set("testOverlap", [{x:8,y:10,r:2,a:.9}]);
 	}
 
 	userFeedback(_str) {
