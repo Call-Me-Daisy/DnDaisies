@@ -4,10 +4,10 @@ const {Client, Intents, MessageAttachment, ThreadChannel} = require("discord.js"
 const {createCanvas, loadImage} = require("canvas");
 const fs = require("fs");
 
-const {Arena, PaintStyle, GuideStyle} = require("./arena");
 const {MultiMap, TreeMap} = require("./utils");
+const {Arena} = require("./arena");
 const {LightLayer} = require("./map-layer");
-
+const {PaintStyle, STYLES} = require("./styles");
 //--------------------------------------------------------------------GLOBALS
 const bot = new Client({intents:[
     Intents.FLAGS.GUILDS,
@@ -272,14 +272,14 @@ class Case {
 //------------------------------------WRAPPED
 function doRectGuide(_arena, _command) {//doGuide>RED (2).. [range => {origin, dim}]
 	let range = Range.parse(_command[2]);
-	_arena.setGuide(GuideStyle.RECT, {origin: range[0], dim: range[1]});
+	_arena.setGuide(STYLES.guide.rect, {origin: range[0], dim: range[1]});
 }
 function doLineGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => origin] [token/coord => pos]
 	let coords = Coord.acceptToken(_arena, _command, 2, 2);
-	_arena.setGuide(GuideStyle.LINE, {origin: coords[0], pos: coords[1]});
+	_arena.setGuide(STYLES.guide.line, {origin: coords[0], pos: coords[1]});
 }
 function doEllipseGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => origin] [int/coord => radii]
-	_arena.setGuide(GuideStyle.ELLIPSE, {
+	_arena.setGuide(STYLES.guide.ellipse, {
 		origin: Coord.acceptToken(_arena, _command, 2),
 		radii: (function(_str){
 			let out = parseInt(_str, 10);
@@ -289,14 +289,14 @@ function doEllipseGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => o
 }
 function doSundailGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => origin] (v => pos/radii)
 	let coords = Coord.acceptToken(_arena, _command, 2, 2);
-	_arena.setGuide(GuideStyle.SUNDAIL, {
+	_arena.setGuide(STYLES.guide.sundail, {
 		origin: coords[0],
 		pos: coords[1],
 		radii: [parseInt(_command[_command.length - 1], 10)]
 	});
 }
 function doConeGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => origin] [radii] [theta]
-	_arena.setGuide(GuideStyle.CONE, {
+	_arena.setGuide(STYLES.guide.cone, {
 		origin: Coord.acceptToken(_arena, _command, 2),
 		radii: (function(_str){
 			let out = parseInt(_str, 10);
@@ -314,7 +314,7 @@ function doSpiderGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => or
 		}
 		return out;
 	}(_arena.getGroup(Case.capital(_command[_command.length-1])));
-	_arena.setGuide(GuideStyle.SPIDER, {
+	_arena.setGuide(STYLES.guide.spider, {
 		origin: Coord.acceptToken(_arena, _command, 2),
 		posLs: (posLs) ? posLs : Coord.parseCSV(_command[_command.length - 1])
 	})
@@ -502,7 +502,7 @@ function doGuide(_links, _command) {//guide ()/[shapeStr] {shapeArgs}
 		}
 		arena.displayGuide();
 		return true;
-	} catch (e) { doFeedback(_links, _command, e); }
+	} catch (e) { throw e; doFeedback(_links, _command, e); }
 }
 function doList(_links, _command) {//list
 	try {

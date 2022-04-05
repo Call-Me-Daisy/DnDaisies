@@ -1,6 +1,6 @@
 const {createCanvas, loadImage} = require("canvas");
 const {Rect} = require("./utils");
-const {PaintStyle, GuideStyle} = require("./styles");
+const {PaintStyle, STYLES} = require("./styles");
 const {BaseLayer, TokenLayer, GuideLayer, LightLayer} = require("./map-layer");
 //--------------------------------------------------------------------CONSTANTS
 const MAX_PH = 1920, MAX_PV = 1080;
@@ -161,12 +161,11 @@ class Arena {
 	displayGuide() {
 		this.layers.guide.display = true;
 	}
-	setGuide(_shapeCode, _shapeArgs) {
+	setGuide(_style, _styleArgs) {
 		this.layers.guide.shapes.push({
-			draw: GuideStyle.getStyle(_shapeCode),
-			args: _shapeArgs
+			draw: _style,
+			args: _styleArgs
 		});
-		this.layers.guide.display = true;
 	}
 
 	async buildMap(_imgUrls) {
@@ -188,7 +187,5 @@ class Arena {
 }
 //--------------------------------------------------------------------FINALIZE
 export {
-	Arena,
-	PaintStyle,
-	GuideStyle
-}
+	Arena
+};

@@ -1,6 +1,6 @@
 const {createCanvas, loadImage} = require("canvas");
 const {Rect} = require("./utils");
-const {PaintStyle, GuideStyle} = require("./styles");
+const {PaintStyle, STYLES} = require("./styles");
 //--------------------------------------------------------------------CONSTANTS
 const FONT_STR = "px Arial";
 //--------------------------------------------------------------------HELP
