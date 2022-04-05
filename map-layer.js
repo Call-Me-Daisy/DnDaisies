@@ -1,6 +1,6 @@
 const {createCanvas, loadImage} = require("canvas");
 const {Rect} = require("./utils");
-const {PaintStyle, STYLES} = require("./styles");
+const {STYLES} = require("./styles");
 //--------------------------------------------------------------------CONSTANTS
 const FONT_STR = "px Arial";
 //--------------------------------------------------------------------HELP
@@ -108,11 +108,10 @@ class BaseLayer extends MapLayer {
 }
 //------------------------------------TOKEN
 class TokenLayer extends MapLayer {
+	static lastLayer = 0;
 	constructor(_dim, _pS, _pM) {
 		super(_dim, _pS, _pM);
 		this.brush.scaleFont(0.75);
-
-		this.topLayer = 0;
 	}
 
 	async paintGroup(_group, _name, _imgUrls) {
@@ -121,28 +120,28 @@ class TokenLayer extends MapLayer {
 				colour: _group.colour,
 				many: (_group.tokens.length > 1),
 				code: _group.code,
-				cell: _group.style.cell
+				error: _group.displayError
 			};
-			let currentStyle = _group.style.main;
-			if (Math.abs(_group.styleCode.main) === PaintStyle.IMAGE) {
+
+			if (_group.style.token.id === STYLES.token.image.id) {
 				if (_imgUrls && _imgUrls.get(_name) !== undefined) {args.img = loadImage(_imgUrls.get(_name));}
-				else {currentStyle = PaintStyle.fill;}
+				else {args.error = true;}
 			}
-			for (const [i, token] of _group.tokens.entries()) {
+			for (const token of _group.tokens) {
 				if (token.visible && !token.removed) {
-					args.i = i;
-					await currentStyle(this.brush, token, args, (_group.styleCode.main < 0));
+					await _group.style.token(this.brush, token, _group.style.cell, args);
 				}
 			}
+			_group.displayError = args.error;
 		}
 	}
 
 	async paint(_groups, _imgUrls) {
 		this.brush.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 		let layers = [];
-		for (let i=0; i<=this.topLayer+1; i++) {layers.push(new Map());}
+		for (let i=0; i<=TokenLayer.lastLayer+1; i++) {layers.push(new Map());}
 		for (const [name, group] of _groups.entries()) {
-			layers[(group.layer !== -1) ? group.layer : this.topLayer+1].set(name, group);
+			layers[(group.layer !== -1) ? group.layer : TokenLayer.lastLayer+1].set(name, group);
 		}
 		for (const layer of layers) {
 			for (const [name, group] of layer) {
@@ -151,22 +150,28 @@ class TokenLayer extends MapLayer {
 		}
 	}
 }
-//------------------------------------GUIDE
-class GuideLayer extends MapLayer {
-	constructor(_dim, _pS, _pM, _stroke = "#3579") {
-		super(_dim, _pS, _pM);
-		this.brush.ctx.strokeStyle = _stroke;
-		this.brush.ctx.lineWidth = _pS;
-
-		this.display = false;
-		this.shapes = [];
-	}
-
-	async paint() {
-		if (this.display) {
-			for (const shape of this.shapes) {await shape.draw(this.brush, shape.args);}
-			this.shapes = [];
-			this.display = false;
+class NameLayer extends TokenLayer {
+	async paintGroup(_group, _name, _imgUrls) {
+		if (_group.tokens.length > 0) {
+			let args = {
+				colour: _group.colour,
+				many: (_group.tokens.length > 1),
+				code: _group.code,
+				error: _group.displayError
+			};
+			let isImage = (_group.style.token.id === STYLES.token.image.id);
+			for (const [i, token] of _group.tokens.entries()) {
+				if (token.visible && !token.removed) {
+					args.i = i;
+					this.brush.ctx.globalCompositeOperation = "source-over";
+					await STYLES.token.fill(this.brush, token, STYLES.cell.clear, args);
+					this.brush.ctx.fillStyle = args.colour;
+					await _group.style.name(this.brush, token, args);
+					this.brush.ctx.globalCompositeOperation = "difference";
+					this.brush.ctx.fillStyle = (!args.error && isImage) ? "#000" : "#fff";
+					await _group.style.name(this.brush, token, args);
+				}
+			}
 		}
 	}
 }
@@ -224,11 +229,31 @@ class LightLayer extends MapLayer {
 		}
 	}
 }
+//------------------------------------GUIDE
+class GuideLayer extends MapLayer {
+	constructor(_dim, _pS, _pM, _stroke = "#3579") {
+		super(_dim, _pS, _pM);
+		this.brush.ctx.strokeStyle = _stroke;
+		this.brush.ctx.lineWidth = _pS;
+
+		this.display = false;
+		this.shapes = [];
+	}
+
+	async paint() {
+		if (this.display) {
+			for (const shape of this.shapes) {await shape.draw(this.brush, shape.args);}
+			this.shapes = [];
+			this.display = false;
+		}
+	}
+}
 //--------------------------------------------------------------------FINALIZE
 export {
 	MapLayer,
 	BaseLayer,
 	TokenLayer,
-	GuideLayer,
-	LightLayer
+	NameLayer,
+	LightLayer,
+	GuideLayer
 }

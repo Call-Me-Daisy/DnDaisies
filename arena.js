@@ -1,7 +1,7 @@
 const {createCanvas, loadImage} = require("canvas");
 const {Rect} = require("./utils");
-const {PaintStyle, STYLES} = require("./styles");
-const {BaseLayer, TokenLayer, GuideLayer, LightLayer} = require("./map-layer");
+const {STYLES} = require("./styles");
+const {BaseLayer, TokenLayer, GuideLayer, LightLayer, NameLayer} = require("./map-layer");
 //--------------------------------------------------------------------CONSTANTS
 const MAX_PH = 1920, MAX_PV = 1080;
 //--------------------------------------------------------------------HELP
@@ -35,15 +35,15 @@ class TokenGroup {
 	static makeCode(_name) {
 		return _name[0].toUpperCase()+_name[_name.length-1].toLowerCase();
 	}
-	constructor(_name, _dim, _styleCodes, _colour, _layer) {
+	constructor(_name, _dim, _styles, _colour, _layer) {
 		this.dim = _dim;
-		this.styleCode = _styleCodes;
+		this.style = _styles;
 		this.colour = _colour;
 		this.layer = _layer;
 
 		this.code = TokenGroup.makeCode(_name);
-		this.style = PaintStyle.getStyle(_styleCodes);
 		this.tokens = [];
+		this.displayError = false;
 	}
 
 	push(_pos, _dim, _visible) {
@@ -80,11 +80,15 @@ class Arena {
 			return {
 				token: new TokenLayer(_dim, _pS),
 				light: new LightLayer(_dim, _pS, 0.5),
-				guide: new GuideLayer(_dim, _pS)
+				guide: new GuideLayer(_dim, _pS),
+				name: new NameLayer(_dim, _pS)
 			};
 		})(this.base.brush.pS)
 
-		this.newGroup({main: PaintStyle.IMAGE, cell: PaintStyle.RECT}, 0, "Background", "#000", _dim);
+		this.newGroup(
+			{token: STYLES.token.image, cell: STYLES.cell.rect, name: STYLES.name.none},
+			0, "Background", "#000", _dim
+		);
 		this.addToGroupSplit("Background", [1,1,0]);
 	}
 
@@ -138,7 +142,7 @@ class Arena {
 	newGroup(_styleCodes, _layer, _name, _colour, _dim = [1,1], _override = false) {
 		if (_override || this.groups.get(_name) === undefined) {
 			this.groups.set(_name, new TokenGroup(_name, _dim, _styleCodes, _colour, _layer));
-			if (_layer > this.layers.token.topLayer) {this.layers.token.topLayer = _layer;}
+			if (_layer > TokenLayer.lastLayer) {TokenLayer.lastLayer = _layer;}
 		}
 		else {
 			this.userFeedback(`Group ${_name} already exists; allow override or use alternate name.`);
@@ -173,6 +177,10 @@ class Arena {
 
 		let ctx = this.base.brush.ctx;
 		let paintArea = new Rect().setFrom(this.base.brush.setFrom(this.base));
+
+		for (const [name, group] of this.groups.entries()) {
+			group.displayError = false;
+		}
 
 		for (const [key, layer] of Object.entries(this.layers)) {
 			ctx.drawImage(

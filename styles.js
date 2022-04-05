@@ -124,7 +124,7 @@ class StyleType {
 	}
 
 	addStyle(_styleName, _style) {
-		if (_style.id === 1) {this.default = _style;}
+		if (_style.id === 0) {this.default = _style;}
 		this[_styleName] = _style;
 	}
 }
@@ -134,7 +134,7 @@ class Style extends Function {
 		let type = STYLES[_type];
 
 		function onCall(){return _onCall(...arguments);}
-		onCall.id = ++type.ID_MAKER;
+		onCall.id = type.ID_MAKER++;
 		Object.setPrototypeOf(onCall, Style.prototype);
 
 		type.addStyle(_name, onCall);
@@ -144,6 +144,7 @@ class Style extends Function {
 //--------------------------------------------------------------------POPULATE
 new Style("cell", "rect", function(_brush){_brush.fillRect();});
 new Style("cell", "ellipse", function(_brush){_brush.fillEllipse();});
+new Style("cell", "clear", function(_brush){_brush.clear();});
 
 new Style("token", "fill", function(_brush, _token, _cell, _args) {
 	_brush.ctx.fillStyle = _args.colour;
@@ -164,8 +165,9 @@ new Style("token", "layer", function(_brush, _token, _cell, _args) {
 	_cell(_brush.centerStretch(3));
 });
 new Style("token", "image", async function(_brush, _token, _cell, _args) {
-	_brush.setFrom(_token);
 	try {
+		if (_args.error) {throw "";}
+		_brush.setFrom(_token);
 		_brush.draw(await _args.img);
 	} catch {
 		STYLES.token.default(_brush, _token, _cell, _args);
@@ -174,12 +176,10 @@ new Style("token", "image", async function(_brush, _token, _cell, _args) {
 });
 
 new Style("name", "centerFull", function(_brush, _token, _args) {
-	_brush.ctx.fillStyle = "#fff8";
 	_brush.setFrom(_token);
 	_brush.write(fullCode(_args));
 });
 new Style("name", "cornerFull", function(_brush, _token, _args) {
-	_brush.ctx.fillStyle = "#fff8";
 	let code = fullCode(_args);
 	_brush.reset();
 	for (const i of [0, 1]) {
@@ -194,11 +194,11 @@ new Style("name", "centerPartial", function(_brush, _token, _args) {
 		STYLES.name.default(_brush, _token, _args);
 	}
 	else if (_args.many) {
-		_brush.ctx.fillStyle = _args.colour;
 		_brush.setFrom(_token);
 		_brush.write((_args.i).toString());
 	}
 });
+new Style("name", "none", function(){});
 
 new Style("guide", "rect", function(_brush, _args) {
 	_brush.set(_args.origin[0], _args.origin[1], _args.dim[0], _args.dim[1]).adjust();
@@ -258,6 +258,5 @@ new Style("guide", "spider", function(_brush, _args) {
 });
 //--------------------------------------------------------------------FINALIZE
 export {
-	PaintStyle,
 	STYLES
 }

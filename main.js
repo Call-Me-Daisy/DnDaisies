@@ -7,7 +7,7 @@ const fs = require("fs");
 const {MultiMap, TreeMap} = require("./utils");
 const {Arena} = require("./arena");
 const {LightLayer} = require("./map-layer");
-const {PaintStyle, STYLES} = require("./styles");
+const {STYLES} = require("./styles");
 //--------------------------------------------------------------------GLOBALS
 const bot = new Client({intents:[
     Intents.FLAGS.GUILDS,
@@ -129,7 +129,7 @@ async function displayMap(_links, _holder) {
 		let out = new Map();
 		for (const [key, msg] of await _holder.img.messages.fetch({limit:100})) {
 			if (msg.attachments.size > 0) {
-				out.set(Case.capital(msg.content), msg.attachemnts.entries().next().value[1].url);
+				out.set(Case.capital(msg.content), msg.attachments.entries().next().value[1].url);
 			}
 		}
 		return out;
@@ -320,13 +320,13 @@ function doSpiderGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => or
 	})
 }
 
-function doNewGroup(_links, _command, _styleCodes, _layer) {//(v) [colour] [name] {rangeCSV} {visible}
+function doNewGroup(_links, _command, _layer, _styles) {//(v) [colour] [name] {rangeCSV} {visible}
 	try {
 		let arena = fetchHolder(_links).arena;
 		let name = Case.capital(_command[2]);
 		let rangeLs = (_command[3] === undefined) ? false : Range.parseCSV(_command[3]);
 		arena.newGroup(
-			_styleCodes,
+			_styles,
 			_layer,
 			name,
 			Colour.parse(_command[1]),
@@ -350,17 +350,7 @@ function makeInstructions(_links, _holder) {
 		instructions.push(`${PREFIX}new ${Coord.unparse(_holder.arena.dim)}`)
 		for (const [name, group] of _holder.arena.groups) {
 			if (group.tokens.length > 0 && name !== "Background") {
-				let groupType = function(_code) {
-					switch (_code) {
-						case PaintStyle.GRID: return "static";
-						case -PaintStyle.GRID: return "effect";
-						case PaintStyle.IMAGE: return "object";
-						case -PaintStyle.IMAGE: return "creature";
-						case -PaintStyle.SWARM: return "swarm";
-
-						default: return "newgroup";
-					}
-				}(group.styleCode);
+				let groupType = "newGroup"; //DEPRECATED
 				let csv = [];
 				for (const token of group.tokens) {
 					csv.push(`${Range.unparse([[token.x, token.y, token.z], [token.h, token.v]])}`);
@@ -502,7 +492,7 @@ function doGuide(_links, _command) {//guide ()/[shapeStr] {shapeArgs}
 		}
 		arena.displayGuide();
 		return true;
-	} catch (e) { throw e; doFeedback(_links, _command, e); }
+	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doList(_links, _command) {//list
 	try {
@@ -547,48 +537,72 @@ function doInstructions(_links, _command) {//instructions
 }
 //------------GROUP
 function doNewStaticGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, {main: PaintStyle.GRID, cell: PaintStyle.RECT}, 1);
+	return doNewGroup(_links, _command, 1, {
+		token: STYLES.token.grid,
+		cell: STYLES.cell.rect,
+		name: STYLES.name.none
+	});
 }
 function doNewObjectGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, {main: PaintStyle.IMAGE, cell: PaintStyle.RECT}, 2);
+	return doNewGroup(_links, _command, 2, {
+		token: STYLES.token.image,
+		cell: STYLES.cell.rect,
+		name: STYLES.name.none
+	});
 }
 function doNewAreaGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, {main: -PaintStyle.GRID, cell: PaintStyle.RECT}, 4);
+	return doNewGroup(_links, _command, 4, {
+		token: STYLES.token.grid,
+		cell: STYLES.cell.rect,
+		name: STYLES.name.centerFull
+	});
 }
 function doNewConcentricGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, {main: -PaintStyle.CONCENTRIC, cell: PaintStyle.ELLIPSE}, 4);
+	return doNewGroup(_links, _command, 4, {
+		token: STYLES.token.layer,
+		cell: STYLES.cell.ellipse,
+		name: STYLES.name.centerFull
+	});
 }
 function doNewSwarmGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, {main: -PaintStyle.SWARM, cell: PaintStyle.ELLIPSE}, 3);
+	return doNewGroup(_links, _command, 3, {
+		token: STYLES.token.grid,
+		cell: STYLES.cell.ellipse,
+		name: STYLES.name.cornerFull
+	});
 }
 function doNewCreatureGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, {main: -PaintStyle.IMAGE, cell: PaintStyle.ELLIPSE}, -1);
+	return doNewGroup(_links, _command, -1, {
+		token: STYLES.token.image,
+		cell: STYLES.cell.ellipse,
+		name: STYLES.name.centerPartial
+	});
 }
 function doNewCustomGroup(_links, _command) {//RED> doNewGroup
-	let main = (function(_main){
-		let named = (_main.length > 1) ? -1 : 1;
-		return named * (function getMainCode(_i){
-			if (_main[_i][0] !== undefined) {
-				switch(_main[i][0].toLowerCase()) {
-					case "f": return PaintStyle.FILL;
-					case "g": return PaintStyle.GRID;
-					case "i": return PaintStyle.IMAGE;
-					case "s": return PaintStyle.SWARM;
-					case "c": return PaintStyle.CONCETRIC;
+	let styles = (function(_token){
+		return {
+			name: (_token.length > 1) ? STYLES.name.default : STYLES.name.none,
+			token: (function getTokenStyle(_i){
+				if (_token[_i][0] === undefined) { return false; }
+				switch(_token[i][0].toLowerCase()) {
+					case "f": return STYLES.token.fill;
+					case "g": return STYLES.token.grid;
+					case "l": return STYLES.token.layer;
+					case "i": return STYLES.token.image;
 				}
-			}
-			return (named + _i < 0) ? getMainCode(1) : false;
-		})(0);
+				return getTokenStyle(_i + 1);
+			})(0)
+		};
 	})(_command[2].split("-"));
-	if (!main) {throw `Invalid main style: ${_command[2]}`;}
+	if (!styles) {throw `Invalid token style: ${_command[2]}`;}
 	let cell = (function(_cell){
 		switch(_cell) {
-			case "r": return PaintStyle.RECT;
-			case "e": return PaintStyle.ELLIPSE;
+			case "r": return STYLES.cell.rect;
+			case "e": return STYLES.cell.ellipse;
 		}
 	})(_command[3]);
 	if (cell === undefined) {throw `Invalid cell style: ${_command[3]}`;}
-	return doNewGroup(_links, _command.slice(4), {main: main, cell: cell}, parseInt(_command[1], 10));
+	return doNewGroup(_links, _command.slice(4), {token: styles, cell: cell}, parseInt(_command[1], 10));
 }
 
 function doMoveGroup(_links, _command) {//movegroup [name] [rangeCSV] {visible}
