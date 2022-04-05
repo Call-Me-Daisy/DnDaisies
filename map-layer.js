@@ -1,5 +1,6 @@
-const {createCanvas} = require("canvas");
+const {createCanvas, loadImage} = require("canvas");
 const {Rect} = require("./utils");
+const {PaintStyle, GuideStyle} = require("./styles");
 //--------------------------------------------------------------------CONSTANTS
 const FONT_STR = "px Arial";
 //--------------------------------------------------------------------HELP
@@ -114,6 +115,28 @@ class TokenLayer extends MapLayer {
 		this.topLayer = 0;
 	}
 
+	async paintGroup(_group, _name, _imgUrls) {
+		if (_group.tokens.length > 0) {
+			let args = {
+				colour: _group.colour,
+				many: (_group.tokens.length > 1),
+				code: _group.code,
+				cell: _group.style.cell
+			};
+			let currentStyle = _group.style.main;
+			if (Math.abs(_group.styleCode.main) === PaintStyle.IMAGE) {
+				if (_imgUrls && _imgUrls.get(_name) !== undefined) {args.img = loadImage(_imgUrls.get(_name));}
+				else {currentStyle = PaintStyle.fill;}
+			}
+			for (const [i, token] of _group.tokens.entries()) {
+				if (token.visible && !token.removed) {
+					args.i = i;
+					await currentStyle(this.brush, token, args, (_group.styleCode.main < 0));
+				}
+			}
+		}
+	}
+
 	async paint(_groups, _imgUrls) {
 		this.brush.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 		let layers = [];
@@ -123,7 +146,7 @@ class TokenLayer extends MapLayer {
 		}
 		for (const layer of layers) {
 			for (const [name, group] of layer) {
-				await group.paintAll(this.brush, await _imgUrls, name);
+				await this.paintGroup(group, name, await _imgUrls);
 			}
 		}
 	}
@@ -165,20 +188,23 @@ class LightLayer extends MapLayer {
 		this.ambientOpacity = _ambientOpacity;
 	}
 
-	paintLight(_x, _y, _r, _a, _startFade = 0.5) {
-		let shadow = this.makeShadow(_a);
-		this.brush.set(_x, _y, _r, _r).alterPos(.5, .5);
-		(function(_ctx, _px, _py, _pr) {
-			let g = _ctx.createRadialGradient(_px, _py, 0, _px, _py, _pr);
-			g.addColorStop(0, shadow);
-			if (_startFade > 0) {g.addColorStop(_startFade, shadow);}
-			g.addColorStop(1, LightLayer.trans);
-
-			_ctx.fillStyle = g;
-		})(this.brush.ctx, this.brush.x, this.brush.y, this.brush.h);
-		this.brush.alterPos(-_r/2, -_r/2);
-		this.brush.centerStretch(2);
-		this.brush.fillRect();
+	async paintGroup(_group, _invert) {
+		let shadow = this.makeShadow((_invert) ? 1 - _group.opacity : _group.opacity);
+		for (const token of _group.tokens) {
+			if (!token.removed) {
+				this.brush.set(token.x, token.y, _group.radius, _group.radius).alterPos(.5, .5);
+				(function(_ctx, _px, _py, _pr, _f){
+					let g = _ctx.createRadialGradient(_px, _py, 0, _px, _py, _pr);
+					g.addColorStop(0, shadow);
+					if (_f > 0) {g.addColorStop(_f, shadow);}
+					g.addColorStop(1, LightLayer.trans);
+					_ctx.fillStyle = g;
+				})(this.brush.ctx, this.brush.x, this.brush.y, this.brush.h, _group.startFade);
+				this.brush.alterPos(-_group.radius/2, -_group.radius/2);
+				this.brush.centerStretch(2);
+				this.brush.fillRect();
+			}
+		}
 	}
 	async paint(_groups) {
 		this.brush.ctx.globalCompositeOperation = "source-over";
@@ -186,14 +212,14 @@ class LightLayer extends MapLayer {
 		this.brush.setFrom(this).fillRect();
 		for (const [name, group] of _groups.entries()) {
 			if (group.opacity && group.opacity > this.ambientOpacity) {
-				group.lightAll(this.brush, this.makeShadow, false);
+				this.paintGroup(group, false);
 			}
 		}
 
 		this.brush.ctx.globalCompositeOperation = "destination-out";
 		for (const [name, group] of _groups.entries()) {
-			if (group.opacity && group.opacity < this.ambientOpacity) {
-				group.lightAll(this.brush, this.makeShadow, true);
+			if ((group.opacity || group.opacity === 0) && group.opacity < this.ambientOpacity) {
+				this.paintGroup(group, true);
 			}
 		}
 	}

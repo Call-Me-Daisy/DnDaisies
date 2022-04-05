@@ -6,6 +6,7 @@ const fs = require("fs");
 
 const {Arena, PaintStyle, GuideStyle} = require("./arena");
 const {MultiMap, TreeMap} = require("./utils");
+const {LightLayer} = require("./map-layer");
 
 //--------------------------------------------------------------------GLOBALS
 const bot = new Client({intents:[
@@ -712,9 +713,9 @@ function doEditAmbientLight(_links, _command) {
 		}
 		switch (rgba.length) {
 			case 1: layer.ambientOpacity = rgba[0]; break;
-			case 3: layer.makeShadow = LightLayer.makeMakeShadow(rgba); break;
+			case 3: layer.makeShadow = LightLayer.makeShadowMaker(rgba); break;
 			case 4:
-				layer.makeShadow = LightLayer.makeMakeShadow(rgba.slice(0,3));
+				layer.makeShadow = LightLayer.makeShadowMaker(rgba.slice(0,3));
 				layer.ambientOpacity = rgba[4];
 				break;
 
