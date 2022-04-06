@@ -80,8 +80,8 @@ class Arena {
 			return {
 				token: new TokenLayer(_dim, _pS),
 				light: new LightLayer(_dim, _pS, 0.5),
-				guide: new GuideLayer(_dim, _pS),
-				name: new NameLayer(_dim, _pS)
+				name: new NameLayer(_dim, _pS, "difference"),
+				guide: new GuideLayer(_dim, _pS)
 			};
 		})(this.base.brush.pS)
 
@@ -90,6 +90,8 @@ class Arena {
 			0, "Background", "#000", _dim
 		);
 		this.addToGroupSplit("Background", [1,1,0]);
+
+		this.shouldUpdate = false;
 	}
 
 	userFeedback(_str) {
@@ -183,12 +185,15 @@ class Arena {
 		}
 
 		for (const [key, layer] of Object.entries(this.layers)) {
+			ctx.globalCompositeOperation = layer.gco;
 			ctx.drawImage(
-				await layer.getCanvas(this.groups, _imgUrls),
+				await layer.getCanvas(this.shouldUpdate, this.groups, _imgUrls),
 				paintArea.x, paintArea.y, paintArea.h, paintArea.v,
 				paintArea.x, paintArea.y, paintArea.h, paintArea.v
 			);
 		}
+
+		this.shouldUpdate = false;
 
 		return ctx.canvas.toBuffer("image/png");
 	}

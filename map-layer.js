@@ -4,6 +4,16 @@ const {STYLES} = require("./styles");
 //--------------------------------------------------------------------CONSTANTS
 const FONT_STR = "px Arial";
 //--------------------------------------------------------------------HELP
+function sliceArgs(_args, _start, _stop) {
+	if (_start === undefined || _start < 0) {return _args;}
+	if (_start >= _args.length) {return [];}
+	const stop = (_stop === undefined || _stop > _args.length) ? _args.length : _stop;
+
+	let out = [];
+	for (let i=_start; i<stop; i++) {out.push(_args[i]);}
+	return out;
+}
+
 class Brush extends Rect {
 	constructor(_ctx, _pS, _pM) {
 		super(_pM, _pM, _pS-2*_pM, _pS-2*_pM);
@@ -63,12 +73,13 @@ class Brush extends Rect {
 }
 //--------------------------------------------------------------------MAIN
 class MapLayer extends Rect {
-	constructor(_dim, _pS, _pM) {
+	constructor(_dim, _pS, _gco = "source-over") {
 		super(1, 1, _dim[0], _dim[1]);
 		this.canvas = createCanvas(_pS*(2+this.h), _pS*(2+this.v));
-		this.brush = new Brush(this.canvas.getContext("2d"), _pS, (_pM !== undefined) ? _pM : Math.ceil(_pS/64));
+		this.brush = new Brush(this.canvas.getContext("2d"), _pS, Math.ceil(_pS/64));
 		this.brush.ctx.textAlign = "center";
 		this.brush.ctx.textBaseline = "middle";
+		this.gco = _gco;
 	}
 
 	clearCanvas() {
@@ -76,21 +87,21 @@ class MapLayer extends Rect {
 		this.brush.clear();
 	}
 	async getCanvas() {
-		//if _some_update_flag_
-		this.clearCanvas();
-		await this.paint(...arguments);
-		//endif
+		if (arguments[0]) {
+			this.clearCanvas();
+			await this.paint(...sliceArgs(arguments, 1));
+		}
 		return this.canvas;
 	}
 }
 //------------------------------------BASE
 class BaseLayer extends MapLayer {
-	constructor(_dim, _pS, _pM) {
-		super(_dim, _pS, _pM);
+	constructor(_dim, _pS) {
+		super(_dim, _pS);
 		this.brush.scaleFont(1);
 	}
 
-	paint(_helper) {
+	paint() {
 		this.brush.ctx.fillStyle = "#000";
 		this.brush.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -109,8 +120,8 @@ class BaseLayer extends MapLayer {
 //------------------------------------TOKEN
 class TokenLayer extends MapLayer {
 	static lastLayer = 0;
-	constructor(_dim, _pS, _pM) {
-		super(_dim, _pS, _pM);
+	constructor(_dim, _pS, _gco) {
+		super(_dim, _pS, _gco);
 		this.brush.scaleFont(0.75);
 	}
 
@@ -127,9 +138,12 @@ class TokenLayer extends MapLayer {
 				if (_imgUrls && _imgUrls.get(_name) !== undefined) {args.img = loadImage(_imgUrls.get(_name));}
 				else {args.error = true;}
 			}
-			for (const token of _group.tokens) {
+			for (const [i, token] of _group.tokens.entries()) {
 				if (token.visible && !token.removed) {
+					args.i = i;
 					await _group.style.token(this.brush, token, _group.style.cell, args);
+					this.brush.ctx.fillStyle = args.colour;
+					await _group.style.name(this.brush, token, args);
 				}
 			}
 			_group.displayError = args.error;
@@ -163,11 +177,7 @@ class NameLayer extends TokenLayer {
 			for (const [i, token] of _group.tokens.entries()) {
 				if (token.visible && !token.removed) {
 					args.i = i;
-					this.brush.ctx.globalCompositeOperation = "source-over";
 					await STYLES.token.fill(this.brush, token, STYLES.cell.clear, args);
-					this.brush.ctx.fillStyle = args.colour;
-					await _group.style.name(this.brush, token, args);
-					this.brush.ctx.globalCompositeOperation = "difference";
 					this.brush.ctx.fillStyle = (!args.error && isImage) ? "#000" : "#fff";
 					await _group.style.name(this.brush, token, args);
 				}
@@ -188,7 +198,7 @@ class LightLayer extends MapLayer {
 	static trans = "rgba(0,0,0,0)";
 
 	constructor(_dim, _pS, _ambientOpacity, _shadowHue = [0,0,0]) {
-		super(_dim, _pS, 0);
+		super(_dim, _pS);
 		this.makeShadow = LightLayer.makeShadowMaker(_shadowHue);
 		this.ambientOpacity = _ambientOpacity;
 	}
@@ -231,8 +241,8 @@ class LightLayer extends MapLayer {
 }
 //------------------------------------GUIDE
 class GuideLayer extends MapLayer {
-	constructor(_dim, _pS, _pM, _stroke = "#3579") {
-		super(_dim, _pS, _pM);
+	constructor(_dim, _pS, _stroke = "#3579") {
+		super(_dim, _pS);
 		this.brush.ctx.strokeStyle = _stroke;
 		this.brush.ctx.lineWidth = _pS;
 

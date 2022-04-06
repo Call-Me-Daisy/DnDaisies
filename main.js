@@ -107,10 +107,14 @@ function ensureHolder(_links) {
 	return fetchHolder(_links);
 }
 
-function requireGroup(_links, _nameRaw) {
-	return fetchHolder(_links).arena.requireGroup(Case.capital(_nameRaw));
+function fetchArena(_links, _update = false) {
+	const arena = fetchHolder(_links).arena;
+	if (_update) {arena.shouldUpdate = true;}
+	return arena;
 }
-
+function requireGroup(_links, _nameRaw, _update) {
+	return fetchArena(_links, _update).requireGroup(Case.capital(_nameRaw));
+}
 function fetchTokens(_group, _iCSV) {
 	if (_group.tokens.length === 1) {return [_group.tokens[0]];}
 	let out = [];
@@ -322,7 +326,7 @@ function doSpiderGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => or
 
 function doNewGroup(_links, _command, _layer, _styles) {//(v) [colour] [name] {rangeCSV} {visible}
 	try {
-		let arena = fetchHolder(_links).arena;
+		let arena = fetchArena(_links);
 		let name = Case.capital(_command[2]);
 		let rangeLs = (_command[3] === undefined) ? false : Range.parseCSV(_command[3]);
 		arena.newGroup(
@@ -334,6 +338,7 @@ function doNewGroup(_links, _command, _layer, _styles) {//(v) [colour] [name] {r
 		);
 		if (rangeLs) {
 			arena.addToGroup(name, rangeLs, (_command[5] === undefined || _command[5][0].toLowerCase() !== "f"));
+			arena.shouldUpdate = true;
 			return true;
 		}
 		return undefined;
@@ -465,6 +470,7 @@ async function doImage(_links, _command) {//image ()/(->msg_with_thread)--image
 			holder.img.setArchived(false);
 			makeTemp(fetchMessage(_links.c.id, holder.img.id).then((_prompt) => {prompt.reply("bump");}));
 		}
+		if (holder.arena) {holder.arena.shouldUpdate = true;}
 		return false;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
@@ -486,9 +492,10 @@ const guideHelper = MultiMap.newMap([
 ]);
 function doGuide(_links, _command) {//guide ()/[shapeStr] {shapeArgs}
 	try {
-		let arena = fetchHolder(_links).arena;
+		let arena = fetchArena(_links);
 		if (_command.length > 1) {
 			guideHelper.get(_command[1].toLowerCase())(arena, _command);
+			arena.shouldUpdate = true;
 		}
 		arena.displayGuide();
 		return true;
@@ -500,7 +507,7 @@ function doList(_links, _command) {//list
 		for (const [key, teamName] of SHORTCUTS) {
 			msgMap.set(COLOURS.get(teamName), [`__Team: ${teamName} (${COLOURS.get(teamName)})__`]);
 		}
-		for (const [name, group] of fetchHolder(_links).arena.groups) {
+		for (const [name, group] of fetchArena(_links).groups) {
 			if (msgMap.get(group.colour) === undefined) {
 				msgMap.set(group.colour, [`__Team: ${group.colour} (No affiliation)__`]);
 			}
@@ -519,7 +526,7 @@ function doList(_links, _command) {//list
 }
 function doDistance(_links, _command) {//distance ([coord]/[name] {i}) ([coord]/[name] {i})
 	try {
-		let arena = fetchHolder(_links).arena;
+		let arena = fetchArena(_links);
 		let coords = Coord.acceptToken(arena, _command, 1, 2);
 		let out = 0;
 		for (let j = 0; j<3; j++) {
@@ -607,7 +614,7 @@ function doNewCustomGroup(_links, _command) {//RED> doNewGroup
 
 function doMoveGroup(_links, _command) {//movegroup [name] [rangeCSV] {visible}
 	try {
-		const tokens = requireGroup(_links, _command[1]).tokens;
+		const tokens = requireGroup(_links, _command[1], true).tokens;
 		let mode = (_command[3] === undefined) ? false : boolSwitch(_command[3], "u");
 
 		let tokenInd = 0;
@@ -628,21 +635,25 @@ function doMoveGroup(_links, _command) {//movegroup [name] [rangeCSV] {visible}
 function doHideGroup(_links, _command) {//hidegroup [name] {mode}
 	try {
 		let mode = boolSwitch(_command[2], "!");
-		for (const token of requireGroup(_links, _command[1]).tokens) {token.visible = mode(token.visible);}
+		for (const token of requireGroup(_links, _command[1], true).tokens) {token.visible = mode(token.visible);}
 		return true;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doRemoveGroup(_links, _command) {//removegroup [name]
 	try {
+		let arena = fetchArena(_links);
 		return (function(_groupExisted){
-			if (_groupExisted) {return true;}
+			if (_groupExisted) {
+				arena.shouldUpdate = true;
+				return true;
+			}
 			return undefined;
-		})(fetchHolder(_links).arena.removeGroup(Case.capital(_command[1])));
+		})(arena.removeGroup(Case.capital(_command[1])));
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 function doResizeGroup(_links, _command) {//resizegroup [name] [dims] {origin}
 	try {
-		let group = requireGroup(_links, _command[1]);
+		let group = requireGroup(_links, _command[1], true);
 		group.dim = (function(_range){
 			return (_range[1]) ? _range[1] : _range[0].slice(0,2);
 		})(Range.parse(_command[2]));
@@ -657,7 +668,7 @@ function doResizeGroup(_links, _command) {//resizegroup [name] [dims] {origin}
 //------------TOKEN
 function doNewToken(_links, _command) {//copy [name] [rangeCSV] {visible}
 	try {
-		fetchHolder(_links).arena.addToGroup(
+		fetchArena(_links, true).addToGroup(
 			Case.capital(_command[1]),
 			Range.parseCSV(_command[2]),
 			(_command[3] === undefined || _command[3][0].toLowerCase() !== "f")
@@ -667,7 +678,7 @@ function doNewToken(_links, _command) {//copy [name] [rangeCSV] {visible}
 }
 function doMoveToken(_links, _command) {//move [name] {iCSV} [rangeCSV] {visible}
 	try {
-		let group = requireGroup(_links, _command[1]);
+		let group = requireGroup(_links, _command[1], true);
 		let [ranges, mode] = (function(_cmd){
 			let out = Range.parseCSV(_cmd);
 			if (out[0][0][0] === undefined) {return [false, boolSwitch(_cmd, "u")];}
@@ -686,7 +697,7 @@ function doMoveToken(_links, _command) {//move [name] {iCSV} [rangeCSV] {visible
 }
 function doHideToken(_links, _command) {//hide [name] {iCSV} {mode}
 	try {
-		let group = requireGroup(_links, _command[1]);
+		let group = requireGroup(_links, _command[1], true);
 		let mode = boolSwitch(_command[_command.length - 1], "!");
 		for (const token of fetchTokens(group, _command[2])) {token.visible = mode(token.visible);}
 		return true;
@@ -694,7 +705,7 @@ function doHideToken(_links, _command) {//hide [name] {iCSV} {mode}
 }
 function doRemoveToken(_links, _command) {//remove [name] {iCSV} {mode} {andGroup}
 	try {
-		let group = requireGroup(_links, _command[1]);
+		let group = requireGroup(_links, _command[1], true);
 		let mode = boolSwitch(_command[_command.length - 1], "t");
 		for (const token of fetchTokens(group, _command[2])) {token.removed = mode(token.removed);}
 
@@ -705,7 +716,7 @@ function doRemoveToken(_links, _command) {//remove [name] {iCSV} {mode} {andGrou
 //--------------------------------------------------------------------TESTING
 function doEditGroupLight(_links, _command) {
 	try {
-		let group = requireGroup(_links, _command[1]);
+		let group = requireGroup(_links, _command[1], true);
 
 		group.radius = parseFloat(_command[2], 10);
 		group.opacity = parseFloat(_command[3], 10);
@@ -716,7 +727,7 @@ function doEditGroupLight(_links, _command) {
 }
 function doEditAmbientLight(_links, _command) {
 	try {
-		let layer = fetchHolder(_links, _command).arena.layers.light;
+		let layer = fetchArena(_links, true).layers.light;
 		let rgba = [];
 		for (const cmd of _command.slice(1)) {
 			rgba.push(...(function(_cmdSplit){
