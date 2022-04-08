@@ -126,7 +126,7 @@ class TokenLayer extends MapLayer {
 	}
 
 	async paintGroup(_group, _name, _imgUrls) {
-		if (_group.tokens.length > 0) {
+		if (_group.willDisplay("token") && _group.tokens.length > 0) {
 			let args = {
 				colour: _group.colour,
 				many: (_group.tokens.length > 1),
@@ -166,7 +166,7 @@ class TokenLayer extends MapLayer {
 }
 class NameLayer extends TokenLayer {
 	async paintGroup(_group, _name, _imgUrls) {
-		if (_group.tokens.length > 0) {
+		if (_group.willDisplay("name") && _group.tokens.length > 0) {
 			let args = {
 				colour: _group.colour,
 				many: (_group.tokens.length > 1),
@@ -204,20 +204,14 @@ class LightLayer extends MapLayer {
 	}
 
 	async paintGroup(_group, _invert) {
-		let shadow = this.makeShadow((_invert) ? 1 - _group.opacity : _group.opacity);
+		let args = {
+			shadow: this.makeShadow((_invert) ? 1 - _group.opacity : _group.opacity),
+			radius: _group.radius,
+			startFade: (_group.startFade !== undefined) ? _group.startFade : ((_invert) ? 0.5 : 0.9)
+		};
 		for (const token of _group.tokens) {
-			if (!token.removed) {
-				this.brush.set(token.x, token.y, _group.radius, _group.radius).alterPos(.5, .5);
-				(function(_ctx, _px, _py, _pr, _f){
-					let g = _ctx.createRadialGradient(_px, _py, 0, _px, _py, _pr);
-					g.addColorStop(0, shadow);
-					if (_f > 0) {g.addColorStop(_f, shadow);}
-					g.addColorStop(1, LightLayer.trans);
-					_ctx.fillStyle = g;
-				})(this.brush.ctx, this.brush.x, this.brush.y, this.brush.h, _group.startFade);
-				this.brush.alterPos(-_group.radius/2, -_group.radius/2);
-				this.brush.centerStretch(2);
-				this.brush.fillRect();
+			if (token.visible && !token.removed) {
+				_group.style.light(this.brush, token, args);
 			}
 		}
 	}
@@ -226,14 +220,14 @@ class LightLayer extends MapLayer {
 		this.brush.ctx.fillStyle = this.makeShadow(this.ambientOpacity);
 		this.brush.setFrom(this).fillRect();
 		for (const [name, group] of _groups.entries()) {
-			if (group.opacity && group.opacity > this.ambientOpacity) {
+			if (group.willDisplay("light") && group.opacity > this.ambientOpacity) {
 				this.paintGroup(group, false);
 			}
 		}
 
 		this.brush.ctx.globalCompositeOperation = "destination-out";
 		for (const [name, group] of _groups.entries()) {
-			if ((group.opacity || group.opacity === 0) && group.opacity < this.ambientOpacity) {
+			if (group.willDisplay("light") && group.opacity < this.ambientOpacity) {
 				this.paintGroup(group, true);
 			}
 		}

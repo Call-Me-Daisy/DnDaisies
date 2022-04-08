@@ -139,8 +139,11 @@ async function displayMap(_links, _holder) {
 		return out;
 	})();
 
-	_holder.map = await sendTo(_links, {
-		files: [new MessageAttachment(await _holder.arena.buildMap(await imgUrls), _links.c.id + "_map.png")]
+	_holder.arena.buildMap(await imgUrls).then((_map) => {
+		cleanMap(_holder);
+		sendTo(_links, {files: [new MessageAttachment(_map, _links.c.id + "_map.png")]}).then((_msg) => {
+			_holder.map = _msg;
+		});
 	});
 }
 //------------------------------------MODES
@@ -234,7 +237,7 @@ class Range {
 	static unparse(_range) {
 		return [
 			Coord.unparse(_range[0]),
-			Coord.unparse([_range[0][0] + _range[1][0] - 1, _range[0][1] + _range[1][1] - 1])
+			Coord.unparse([_range[0][0] + _range[1][0] - 1, _range[0][1] + _range[1][1] - 1]),
 		].join(":");
 	}
 
@@ -260,8 +263,7 @@ class Colour {
 		return rgba.join("");
 	}
 	static parseStr(_str) {
-		let out = (_str.startsWith("#")) ? _str : COLOURS.get(SHORTCUTS.get(_str[0].toLowerCase()));
-		return (out === undefined) ? Colour.DEFAULT : out;
+		return (_str.startsWith("#")) ? _str : COLOURS.get(SHORTCUTS.get(_str[0].toLowerCase()));
 	}
 	static parse(_colour) {
 		return (_colour instanceof Array) ? Colour.parseNum(_colour) : Colour.parseStr(_colour);
@@ -329,6 +331,7 @@ function doNewGroup(_links, _command, _layer, _styles) {//(v) [colour] [name] {r
 		let arena = fetchArena(_links);
 		let name = Case.capital(_command[2]);
 		let rangeLs = (_command[3] === undefined) ? false : Range.parseCSV(_command[3]);
+		_styles.light = STYLES.general.none;
 		arena.newGroup(
 			_styles,
 			_layer,
@@ -355,15 +358,37 @@ function makeInstructions(_links, _holder) {
 		instructions.push(`${PREFIX}new ${Coord.unparse(_holder.arena.dim)}`)
 		for (const [name, group] of _holder.arena.groups) {
 			if (group.tokens.length > 0 && name !== "Background") {
-				let groupType = "newGroup"; //DEPRECATED
-				let csv = [];
-				for (const token of group.tokens) {
-					csv.push(`${Range.unparse([[token.x, token.y, token.z], [token.h, token.v]])}`);
+				let styles = new Map();
+				for (const [styleType, groupStyle] of Object.entries(group.style)) {
+					styles.set(styleType, (function(_id){
+						if (_id < 0) {return "none";}
+						for (const [styleName, style] of Object.entries(STYLES[styleType])) {
+							if (styleName !== "default" && _id === style.id) {return styleName;}
+						}
+					})(groupStyle.id));
 				}
-				instructions.push(`${PREFIX}${groupType} ${group.colour} ${name} ${csv.join(",")}`);
+				let msgStyles = [];
+				for (const [layerName, styleName] of styles.entries()) {
+					if (layerName !== "light") {msgStyles.push(styleName);}
+				}
+				let csv = [];
+				let hidden = [];
+				let removed = [];
+				for (const [i, token] of group.tokens.entries()) {
+					csv.push(`${Range.unparse([[token.x, token.y, token.z], [token.h, token.v]])}`);
+					if (!token.visible) {hidden.push(i);}
+					if (token.removed) {removed.push(i);}
+				}
+				instructions.push(`${PREFIX}custom ${group.layer} ${msgStyles.join(" ")}` +
+					`${group.colour} ${name} ${csv.join(",")}`);
+				if (hidden.length > 0) {instructions.push(`${PREFIX}hide ${name} ${hidden.join(",")}`);}
+				if (removed.length > 0) {instructions.push(`${PREFIX}remove ${name} ${removed.join(",")}`);}
+				if (styles.get("light") !== "none") {
+					instructions.push(`${PREFIX}editlight ${name} ${group.radius} ${group.opacity}` +
+						((group.startFade !== undefined) ? " " + group.startFade.toString() : ""));
+				}
 			}
 		}
-		instructions.push(`${PREFIX}map`);
 	}
 	sendTo(_links, instructions.join("\n"));
 }
@@ -475,13 +500,6 @@ async function doImage(_links, _command) {//image ()/(->msg_with_thread)--image
 	} catch (e) { doFeedback(_links, _command, e); }
 }
 //------------ARENA
-function doNewArena(_links, _command) {//new [coord: bottom-right]
-	try {
-		ensureHolder(_links).arena = new Arena(Coord.parse(_command[1]).slice(0,2), sendTemp, _links);
-		return true;
-	} catch (e) { throw e; doFeedback(_links, _command, e); }
-}
-
 const guideHelper = MultiMap.newMap([
 	[["rect", "box", "square"], doRectGuide],
 	[["line", "straight"], doLineGuide],
@@ -542,76 +560,38 @@ function doInstructions(_links, _command) {//instructions
 		return undefined;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
-//------------GROUP
-function doNewStaticGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, 1, {
-		token: STYLES.token.grid,
-		cell: STYLES.cell.rect,
-		name: STYLES.name.none
-	});
-}
-function doNewObjectGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, 2, {
-		token: STYLES.token.image,
-		cell: STYLES.cell.rect,
-		name: STYLES.name.none
-	});
-}
-function doNewAreaGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, 4, {
-		token: STYLES.token.grid,
-		cell: STYLES.cell.rect,
-		name: STYLES.name.centerFull
-	});
-}
-function doNewConcentricGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, 4, {
-		token: STYLES.token.layer,
-		cell: STYLES.cell.ellipse,
-		name: STYLES.name.centerFull
-	});
-}
-function doNewSwarmGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, 3, {
-		token: STYLES.token.grid,
-		cell: STYLES.cell.ellipse,
-		name: STYLES.name.cornerFull
-	});
-}
-function doNewCreatureGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, -1, {
-		token: STYLES.token.image,
-		cell: STYLES.cell.ellipse,
-		name: STYLES.name.centerPartial
-	});
-}
-function doNewCustomGroup(_links, _command) {//RED> doNewGroup
-	let styles = (function(_token){
-		return {
-			name: (_token.length > 1) ? STYLES.name.default : STYLES.name.none,
-			token: (function getTokenStyle(_i){
-				if (_token[_i][0] === undefined) { return false; }
-				switch(_token[i][0].toLowerCase()) {
-					case "f": return STYLES.token.fill;
-					case "g": return STYLES.token.grid;
-					case "l": return STYLES.token.layer;
-					case "i": return STYLES.token.image;
-				}
-				return getTokenStyle(_i + 1);
-			})(0)
-		};
-	})(_command[2].split("-"));
-	if (!styles) {throw `Invalid token style: ${_command[2]}`;}
-	let cell = (function(_cell){
-		switch(_cell) {
-			case "r": return STYLES.cell.rect;
-			case "e": return STYLES.cell.ellipse;
+function doEditAmbientLight(_links, _command) {//ambient [a] / [r] [g] [b] {a} / rgb{a}CSV
+	try {
+		let layer = fetchArena(_links, true).layers.light;
+		let rgba = [];
+		for (const cmd of _command.slice(1)) {
+			rgba.push(...(function(_cmdSplit){
+				let out = [];
+				for (const val of _cmdSplit) {out.push(parseFloat(val, 10).toFixed(2));}
+				return out;
+			})(cmd.split(",")));
 		}
-	})(_command[3]);
-	if (cell === undefined) {throw `Invalid cell style: ${_command[3]}`;}
-	return doNewGroup(_links, _command.slice(4), {token: styles, cell: cell}, parseInt(_command[1], 10));
+		switch (rgba.length) {
+			case 1: layer.ambientOpacity = rgba[0]; break;
+			case 3: layer.makeShadow = LightLayer.makeShadowMaker(rgba); break;
+			case 4:
+				layer.makeShadow = LightLayer.makeShadowMaker(rgba.slice(0, 3));
+				layer.ambientOpacity = rgba[4];
+				break;
+
+			default: throw `doEditAmbientLight cannot take ${rgba.length} arguments.`
+		}
+		return true;
+	} catch (e) {doFeedback(_links, _command, e); }
 }
 
+function doNewArena(_links, _command) {//new [coord: bottom-right]
+	try {
+		ensureHolder(_links).arena = new Arena(Coord.parse(_command[1]).slice(0,2), sendTemp, _links);
+		return true;
+	} catch (e) { doFeedback(_links, _command, e); }
+}
+//------------GROUP
 function doMoveGroup(_links, _command) {//movegroup [name] [rangeCSV] {visible}
 	try {
 		const tokens = requireGroup(_links, _command[1], true).tokens;
@@ -665,17 +645,115 @@ function doResizeGroup(_links, _command) {//resizegroup [name] [dims] {origin}
 		return true;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
-//------------TOKEN
-function doNewToken(_links, _command) {//copy [name] [rangeCSV] {visible}
+function doEditGroupLight(_links, _command) {//makelight [name] ()/([radius] [opacity] {startFade})
 	try {
-		fetchArena(_links, true).addToGroup(
-			Case.capital(_command[1]),
-			Range.parseCSV(_command[2]),
-			(_command[3] === undefined || _command[3][0].toLowerCase() !== "f")
-		);
-		return true;
+		let group = requireGroup(_links, _command[1], true);
+		if (_command.length > 3) {
+			group.radius = parseFloat(_command[2], 10);
+			group.opacity = parseFloat(_command[3], 10);
+			if (_command[4] !== undefined) {group.startFade = parseFloat(_command[4], 10);}
+		}
+		group.style.light = (function(_r, _o, _current){
+			return (
+				!(_r === undefined || isNaN(_r) || _o === undefined || isNaN(_o)) &&
+				(_current.id === STYLES.general.none.id || _command.length > 3)
+			);
+		})(group.radius, group.opacity, group.style.light) ? STYLES.light.gradient : STYLES.general.none;
+		return (group.tokens.length > 0);
 	} catch (e) { doFeedback(_links, _command, e); }
 }
+
+function doNewStaticGroup(_links, _command) {//RED> doNewGroup
+	return doNewGroup(_links, _command, 1, {
+		token: STYLES.token.grid,
+		cell: STYLES.cell.rect,
+		name: STYLES.general.none
+	});
+}
+function doNewObjectGroup(_links, _command) {//RED> doNewGroup
+	return doNewGroup(_links, _command, 2, {
+		token: STYLES.token.image,
+		cell: STYLES.cell.rect,
+		name: STYLES.general.none
+	});
+}
+function doNewAreaGroup(_links, _command) {//RED> doNewGroup
+	return doNewGroup(_links, _command, 4, {
+		token: STYLES.token.grid,
+		cell: STYLES.cell.rect,
+		name: STYLES.name.middle
+	});
+}
+function doNewConcentricGroup(_links, _command) {//RED> doNewGroup
+	return doNewGroup(_links, _command, 4, {
+		token: STYLES.token.layer,
+		cell: STYLES.cell.ellipse,
+		name: STYLES.name.middle
+	});
+}
+function doNewSwarmGroup(_links, _command) {//RED> doNewGroup
+	return doNewGroup(_links, _command, 3, {
+		token: STYLES.token.grid,
+		cell: STYLES.cell.ellipse,
+		name: STYLES.name.corner
+	});
+}
+function doNewCreatureGroup(_links, _command) {//RED> doNewGroup
+	return doNewGroup(_links, _command, -1, {
+		token: STYLES.token.image,
+		cell: STYLES.cell.ellipse,
+		name: STYLES.name.partial
+	});
+}
+function doNewLightGroup(_links, _command) {//(RED> doEditGroupLight).concat({rangeCSV});
+	doNewGroup(_links, ["", "o", _command[1], (_command.length > 4) ? _command[_command.length-1] : undefined], 0, {
+			token: STYLES.general.none,
+			cell: STYLES.cell.rect,
+			name: STYLES.general.none
+		}
+	);
+	return doEditGroupLight(_links, _command);
+}
+function doNewCustomGroup(_links, _command) {//custom [layer] [token] [cell] [name] {light} RED> doNewGroup
+	let token = (function(_token){
+		switch(_token[0].toLowerCase()) {
+			case "f": return STYLES.token.fill;
+			case "g": return STYLES.token.grid;
+			case "l": return STYLES.token.layer;
+			case "i": return STYLES.token.image;
+			case "n": return STYLES.general.none;
+
+			default: throw `Invalid token style for custom group: ${_token}`;
+		}
+	})(_command[2]);
+	let cell = (function(_cell){
+		switch(_cell[0].toLowerCase()) {
+			case "r": return STYLES.cell.rect;
+			case "e": return STYLES.cell.ellipse;
+			case "c": return STYLES.cell.clear;
+			case "n": return STYLES.general.none;
+
+			default: throw `Invalid cell style for custom group: ${_token}`;
+		}
+	})(_command[3]);
+	let name = (function(_name){
+		switch(_name[0].toLowerCase()) {
+			case "m": return STYLES.name.middle;
+			case "c": return STYLES.name.corner;
+			case "p": return STYLES.name.partial;
+			case "n": return STYLES.general.none;
+
+			default: return STYLES.general.none;
+		}
+	})(_command[4]);
+
+	return doNewGroup(_links, _command.slice(4), parseInt(_command[1], 10), {
+		token: token,
+		cell: cell,
+		name: name
+	});
+}
+//------------TOKEN
 function doMoveToken(_links, _command) {//move [name] {iCSV} [rangeCSV] {visible}
 	try {
 		let group = requireGroup(_links, _command[1], true);
@@ -713,42 +791,18 @@ function doRemoveToken(_links, _command) {//remove [name] {iCSV} {mode} {andGrou
 		return true;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
+
+function doNewToken(_links, _command) {//copy [name] [rangeCSV] {visible}
+	try {
+		fetchArena(_links, true).addToGroup(
+			Case.capital(_command[1]),
+			Range.parseCSV(_command[2]),
+			(_command[3] === undefined || _command[3][0].toLowerCase() !== "f")
+		);
+		return true;
+	} catch (e) { doFeedback(_links, _command, e); }
+}
 //--------------------------------------------------------------------TESTING
-function doEditGroupLight(_links, _command) {
-	try {
-		let group = requireGroup(_links, _command[1], true);
-
-		group.radius = parseFloat(_command[2], 10);
-		group.opacity = parseFloat(_command[3], 10);
-		group.startFade = parseFloat(_command[4], 10);
-
-		return true;
-	} catch (e) {throw e; doFeedback(_links, _command, e); }
-}
-function doEditAmbientLight(_links, _command) {
-	try {
-		let layer = fetchArena(_links, true).layers.light;
-		let rgba = [];
-		for (const cmd of _command.slice(1)) {
-			rgba.push(...(function(_cmdSplit){
-				let out = [];
-				for (const val of _cmdSplit) {out.push(parseFloat(val, 10).toFixed(2));}
-				return out;
-			})(cmd.split(",")));
-		}
-		switch (rgba.length) {
-			case 1: layer.ambientOpacity = rgba[0]; break;
-			case 3: layer.makeShadow = LightLayer.makeShadowMaker(rgba); break;
-			case 4:
-				layer.makeShadow = LightLayer.makeShadowMaker(rgba.slice(0,3));
-				layer.ambientOpacity = rgba[4];
-				break;
-
-			default: throw `doEditAmbientLight cannot take ${rgba.length} arguments.`
-		}
-		return true;
-	} catch (e) {throw e; doFeedback(_links, _command, e); }
-}
 async function doTest(_links, _command) {
 
 }
@@ -773,6 +827,7 @@ const commandHelper = MultiMap.newMap([
 	[["grid", "area"], doNewAreaGroup],
 	[["circular", "concentric"], doNewConcentricGroup],
 	[["creature"], doNewCreatureGroup],
+	[["light", "dark"], doNewLightGroup],
 	[["custom", "tailor"], doNewCustomGroup],
 	[["movegroup"], doMoveGroup],
 	[["hidegroup", "revealgroup"], doHideGroup],
@@ -782,7 +837,7 @@ const commandHelper = MultiMap.newMap([
 	[["move"], doMoveToken],
 	[["hide", "reveal"], doHideToken],
 	[["remove"], doRemoveToken],
-	[["light", "dark"], doEditGroupLight],
+	[["editlight", "editdark"], doEditGroupLight],
 	[["ambient"], doEditAmbientLight]
 ]);
 
@@ -794,7 +849,7 @@ async function mainSwitch(_links, _command, _flags) {
 			(function(_shouldDisplay){
 				if (_flags.display === undefined) {_flags.display = _shouldDisplay;}
 			})(await commandHelper.get(_command[0])(_links, _command));
-		} catch (e) { throw e; sendTemp(_links, `Unknown command: ${_command[0]}`); }
+		} catch (e) { sendTemp(_links, `Unknown command: ${_command[0]}`); }
 		if (_flags.delete === undefined) {_flags.delete = true;}
 	}
 	if (_command[0].toLowerCase().startsWith("keep")) {_flags.delete = false;}

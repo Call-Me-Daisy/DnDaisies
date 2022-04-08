@@ -66,6 +66,9 @@ class TokenGroup {
 		}
 		return true;
 	}
+	willDisplay(_layer) {
+		return (this.style[_layer].id !== STYLES.general.none.id);
+	}
 }
 //------------------------------------ARENA
 class Arena {
@@ -73,6 +76,7 @@ class Arena {
 		this.feedhelp = _feedhelp;
 		this.feedback = _feedback; //void function(_feedhelp, string) => tells user what they did wrong
 
+		this.dim = _dim;
 		this.groups = new Map();
 
 		this.base = new BaseLayer(_dim, Math.floor(Math.min(_pH/_dim[0], _pV/_dim[1])));
@@ -85,8 +89,12 @@ class Arena {
 			};
 		})(this.base.brush.pS)
 
-		this.newGroup(
-			{token: STYLES.token.image, cell: STYLES.cell.rect, name: STYLES.name.none},
+		this.newGroup({
+			token: STYLES.token.image,
+			cell: STYLES.cell.rect,
+			name: STYLES.general.none,
+			light: STYLES.general.none
+		},
 			0, "Background", "#000", _dim
 		);
 		this.addToGroupSplit("Background", [1,1,0]);

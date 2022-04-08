@@ -189,12 +189,6 @@
 			"*No Arguments*"
 		]
 	},
-	"newgroup" : {
-		"type" : "commands",
-		"msg" : [
-			"Not currently implemented"
-		]
-	},
 	"movegroup" : {
 		"type" : "commands",
 		"msg" : [
@@ -277,6 +271,30 @@
 			"Note: [2] can be omitted if there is only one **token** in the **group**"
 		]
 	},
+	"editlight" : {
+		"type" : "commands",
+		"msg" : [
+			"Alter every **token** in an existing **group** to emit/absorb light around them.",
+			"[1] **Name** of **group** to be altered.",
+			"[2] Radius out to which **tokens** should emit/absorb light.",
+			"[3] Opacity of darkness to leave in the area (0 - 1 = no darkness - opaque).",
+			"{4} Decimal percentage to offset before light/darkness begins to fade to ambient.",
+			"^Default: Assumes 0.5",
+			"Note: If no arguments are provided, will toggle light functionality on/off for this group",
+			"Note: ^ Functionality will only be toggled on this way if radius and opacity have previously been set"
+		]
+	},
+	"ambient" : {
+		"type" : "commands",
+		"msg" : [
+			"Alter the opacity and/or colour of the ambient light in the **arena**...",
+			"1. Only change opacity: [1] Opacity",
+			"2. Only change colour: [1] Red, [2] Green, [3] Blue OR [1] **CSV** of RGB values",
+			"3. Change both: [1] Red, [2] Green, [3] Blue, [4] Opacity OR [1] **CSV** of RGBA values",
+			"Note: Opacity, or 'Alpha' value is measured 0 (bright light) to 1 (completely opaque)",
+			"Note: Colour, or 'RGB' values are measured 0 to 255 (higher numbers mean more of that colour present)"
+		]
+	},
 	"explain" : {
 		"type" : "alias",
 		"msg" : "help"
@@ -325,6 +343,10 @@
 		"type" : "alias",
 		"msg" : "hide"
 	},
+	"editdark" : {
+		"type" : "alias",
+		"msg" : "editlight"
+	},
 	"groups" : {
 		"type" : "category",
 		"msg" : [
@@ -332,10 +354,11 @@
 			"**Arguments** of preset **groups** are all:",
 			"[1] **Team** of **group**.",
 			"[2] **Name** of **group**.",
-			"{3} **CSV** of **ranges** to also create tokens in.",
+			"{3} **CSV** of **ranges** to also create tokens in; the first **range** sets the default dimensions.",
 			"{4} (true/false) = Created tokens should be (visible/hidden).",
-			"Note: If the first entry in {3} is a **coord**, the dimensions will be set to 1-1",
-			"Note: The dimension of any **coords** in {3} will be set to that of the first entry\n"
+			"Default: {3} No **tokens** will be added to the **arena**, and default dimensions are set to 1-1",
+			"Default: {4} Assumes true",
+			"Note: Any coords in {3} will have their dimensions set to the default for the group\n"
 		]
 	},
 	"static" : {
@@ -343,17 +366,19 @@
 		"msg" : [
 			"An unobtrusive section of background - ideal for large areas of terrain.",
 			"LAYER: 1",
-			"MAIN: GRID",
-			"CELL: RECT"
+			"TOKEN: GRID",
+			"CELL: RECT",
+			"NAME: NONE"
 		]
 	},
 	"object" : {
 		"type" : "groups",
 		"msg" : [
-			"A marginally obtrusive section of background - ideal for larger solid objects.",
+			"A marginally obtrusive section of background - ideal for relatively small solid objects.",
 			"LAYER: 2",
-			"MAIN: IMAGE",
-			"CELL: RECT"
+			"TOKEN: IMAGE",
+			"CELL: RECT",
+			"NAME: NONE"
 		]
 	},
 	"swarm" : {
@@ -361,8 +386,9 @@
 		"msg" : [
 			"A large group of indistinguisable tokens pushed to the background to be less obtrustive.",
 			"LAYER: 3",
-			"MAIN: SWARM-NAMED",
-			"CELL: ELLIPSE"
+			"TOKEN: GRID",
+			"CELL: ELLIPSE",
+			"NAME: CORNER"
 		]
 	},
 	"area" : {
@@ -370,17 +396,19 @@
 		"msg" : [
 			"An unobtrusive section of midground - ideal for retangular AoE spells/effects.",
 			"LAYER: 4",
-			"MAIN: GRID-NAMED",
-			"CELL: RECT"
+			"TOKEN: GRID",
+			"CELL: RECT",
+			"NAME: MIDDLE"
 		]
 	},
 	"concentric" : {
 		"type" : "groups",
 		"msg" : [
-			"An double-layered section of midground - ideal for circular AoE spells/effects.",
+			"A double-layered section of midground - ideal for circular AoE spells/effects.",
 			"LAYER: 4",
-			"MAIN: CONCENTRIC-NAMED",
-			"CELL: ELLIPSE"
+			"TOKEN: CONCENTRIC",
+			"CELL: ELLIPSE",
+			"NAME: MIDDLE"
 		]
 	},
 	"creature" : {
@@ -388,8 +416,9 @@
 		"msg" : [
 			"Dynamic tokens that should be individual even among similar tokens (ie. to track HP).",
 			"LAYER: -1",
-			"MAIN: IMAGE-NAMED",
-			"CELL: ELLIPSE"
+			"TOKEN: IMAGE",
+			"CELL: ELLIPSE",
+			"NAME: PARTIAL"
 		]
 	},
 	"custom" : {
@@ -397,9 +426,25 @@
 		"msg" : [
 			"Mix and match **styles** to tailor your **tokens**' appearances.",
 			"[1] LAYER",
-			"[2] MAIN",
+			"[2] TOKEN",
 			"[3] CELL",
-			"[4],[5],{6},{7} **Arguments** of preset **groups**"
+			"{4} NAME",
+			"^Default: Assumes NONE",
+			"Followed by the **arguments** of the preset **groups**.",
+			"Note: See **styles** for a comprehensive list"
+		]
+	},
+	"light" : {
+		"type": "groups",
+		"msg" : [
+			"A **group** that is invisible except for the light it emits - ideal for small atmospheric lighting.",
+			"Most of the preset **arguments** are unimportant for these **groups**, so they are called as follows:",
+			"[1] **Name** of **group**.",
+			"[2] Radius of the light/dark area surrounding this **group**'s **tokens**.",
+			"[3] Opacity of darkness in the area surrounding this **group**'s **tokens**.",
+			"{4} **CSV** of **ranges** in which to place new **tokens**.",
+			"Note: The light/dark areas are centered at the center of the **tokens**, so dimensions still matter",
+			"Note: To make a visible group that emits/absorbs, see the **editlight** **command**"
 		]
 	},
 	"rectangular" : {
@@ -413,6 +458,10 @@
 	"tailor" : {
 		"type" : "alias",
 		"msg" : "custom"
+	},
+	"dark" : {
+		"type" : "alias",
+		"msg" : "light"
 	},
 	"guides" : {
 		"type" : "category",
@@ -506,48 +555,18 @@
 		"msg" : [
 			"__This section is only important if you want to make *custom* **tokens**.__",
 			"The options for how a **group** is drawn onto the **map**.",
-			"There are three customisations for a **group**: LAYER, MAIN, and CELL.",
-			"Tokens are drawn in order of LAYER (low to high, though -1 is *always* drawn on the top).",
-			"MAIN styles dictate the technique to use when drawing the **token**, including how its name is shown",
-			"CELL styles dictate the pattern used *by* the MAIN for each distinct shape.",
-			"Note: You need not include the _main or _cell when making your tokens; that's just for clarity here",
-			"Note: To show a token's name, use Named-[MAIN] or [MAIN]-Named"
+			"There are four customisations for a **group**: LAYER, TOKEN, CELL, NAME, and LIGHT.",
+			"Tokens are drawn in order of LAYER (low to high, though -1 is *always* drawn last so it's at the top).",
+			"TOKEN styles determine the major features of the token's appearance",
+			"CELL styles determine the pattern used *by* the TOKEN style for each distinct shape.",
+			"NAME styles determine where and how much of a **token**'s **name** is displayed on the map.",
+			"Note: You need not include the qualifier (_main) when making your tokens; that's just for clarity here"
 		]
 	},
-	"fill_main" : {
+	"none_general" : {
 		"type" : "styles",
 		"msg" : [
-			"Scale a CELL to the **token**'s dimensions and fill it its **team** colour.",
-			"**Name** is displayed in the center of the **token**, in black."
-		]
-	},
-	"grid_main" : {
-		"type" : "styles",
-		"msg" : [
-			"Draw a CELL on each **coord** contained within the **token**'s dimensions.",
-			"**Name** is displayed in the center of the **token**, in white."
-		]
-	},
-	"image_main" : {
-		"type" : "styles",
-		"msg" : [
-			"Search for a matching **image** and scale that to the **token**'s dimensions.",
-			"**Name** is dislayed in the center of the **token**, in its **team** colour.",
-			"Note: If no **image** can be found, this defaults to **fill_main**"
-		]
-	},
-	"swarm_main" : {
-		"type" : "styles",
-		"msg" : [
-			"Draw a CELL on each **coord** contained within the **token**'s dimensions.",
-			"**Name** is displayed atop the four corner cells, in black."
-		]
-	},
-	"concentric_main" : {
-		"type" : "styles",
-		"msg" : [
-			"Draw a CELL at the **token**'s dimensions, then draw another at 3x scale with the first in the center.",
-			"**Name** is displayed in the center of the **token**, in white."
+			"Does nothing; can be used in place of any other style (though most commonly LIGHT and NAME)."
 		]
 	},
 	"rect_cell" : {
@@ -560,6 +579,54 @@
 		"type" : "styles",
 		"msg" : [
 			"A filled ellipse entirely contained within the bounds it was drawn with."
+		]
+	},
+	"clear_cell" : {
+		"type" : "styles",
+		"msg" : [
+			"Erase everything that was previously painted within the bounds of this rectangle."
+		]
+	},
+	"fill_token" : {
+		"type" : "styles",
+		"msg" : [
+			"One CELL, the size and position of the **token** being painted."
+		]
+	},
+	"grid_token" : {
+		"type" : "styles",
+		"msg" : [
+			"Many 1-1 CELLs that together make up the size and position of the **token** being painted."
+		]
+	},
+	"layer_token" : {
+		"type" : "styles",
+		"msg" : [
+			"A **fill_token** in the center of a larger, translucent, copy."
+		]
+	},
+	"image_token" : {
+		"type" : "styles",
+		"msg" : [
+			"Load an image from the **thread** command, and scale it to fill the size and position of the **token**."
+		]
+	},
+	"middle_name" : {
+		"type" : "styles",
+		"msg" : [
+			"Print the **token**'s full **code** in its center."
+		]
+	},
+	"corner_name" : {
+		"type" : "styles",
+		"msg" : [
+			"Print the **token**'s full **code** in each of its corners."
+		]
+	},
+	"partial_name" : {
+		"type" : "styles",
+		"msg" : [
+			"Print only the **token**'s **index** in its center."
 		]
 	}
 }
