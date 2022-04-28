@@ -253,7 +253,7 @@ class GuideLayer extends MapLayer {
 	}
 }
 //--------------------------------------------------------------------FINALIZE
-export {
+module.exports = {
 	MapLayer,
 	BaseLayer,
 	TokenLayer,

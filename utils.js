@@ -103,7 +103,7 @@ class MultiMap {
 	}
 }
 //--------------------------------------------------------------------FINALIZE
-export {
+module.exports = {
 	Rect,
 	MultiMap,
 	TreeMap

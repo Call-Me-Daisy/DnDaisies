@@ -177,6 +177,6 @@ new Style("guide", "spider", function(_brush, _args){
 });
 
 //--------------------------------------------------------------------FINALIZE
-export {
+module.exports = {
 	STYLES
 }
