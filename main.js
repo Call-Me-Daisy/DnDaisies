@@ -352,7 +352,7 @@ function doFeedback(_links, _command, e) {
 	sendTemp(_links, `Operation cancelled due to error: ${_command[0]}`);
 }
 
-function makeInstructions(_links, _holder) {
+function makeInstructions(_holder) {
 	let instructions = [];
 	if (_holder.arena) {
 		instructions.push(`${PREFIX}new ${Coord.unparse(_holder.arena.dim)}`)
@@ -379,8 +379,9 @@ function makeInstructions(_links, _holder) {
 					if (!token.visible) {hidden.push(i);}
 					if (token.removed) {removed.push(i);}
 				}
-				instructions.push(`${PREFIX}custom ${group.layer} ${msgStyles.join(" ")}` +
-					`${group.colour} ${name} ${csv.join(",")}`);
+				instructions.push(
+					`${PREFIX}custom ${group.layer} ${msgStyles.join(" ")} ` + `${group.colour} ${name} ${csv.join(",")}`
+				);
 				if (hidden.length > 0) {instructions.push(`${PREFIX}hide ${name} ${hidden.join(",")}`);}
 				if (removed.length > 0) {instructions.push(`${PREFIX}remove ${name} ${removed.join(",")}`);}
 				if (styles.get("light") !== "none") {
@@ -389,41 +390,58 @@ function makeInstructions(_links, _holder) {
 				}
 			}
 		}
+		return instructions.join("\n");
 	}
-	sendTo(_links, instructions.join("\n"));
+	return false;
 }
 //------------------------------------ADMIN
-function doQuit(_links, _command) {//quit
-	for (const [id, holder] of allArenas) {
-		if (_command[1] && _command[1][0].toLowerCase() !== "f") {makeInstructions(_links, holder);}
-
-		cleanMap(holder);
-		cleanImg(holder);
-	}
-	setTimeout(function() {bot.destroy();}, HELPTIMER*1.5);
-	return false;
-}
-function doPing(_links, _command) {//ping
-	sendTo(_links, `pong: ${Date.now()-_links.m.createdTimestamp} ms`);
-	return false;
-}
-function doLog(_links, _command) {//log [link code]/(->msg_to_log)--log
-	let ref = fetchReference(_links.m);
-	if (ref) {
-		ref.then((msg) => {console.log(msg);});
-	}
-	else if (_command.length > 1) {
-		switch (_command[1][0].toLowerCase()) {
-			case "m": console.log(_links.m); break;
-			case "c": console.log(_links.c); break;
-			case "g": console.log(_links.g); break;
-			case "t": console.log(_links.t); break;
+function doQuit(_links, _command, _force = false) {//quit [make instructions]
+	if (_force || _links.m.author.id === process.env.ADMINID) {
+		const instructionFunction = (_command[1] && _command[1][0].toLowerCase() === "f")
+		? function(){return;}
+		: function(_id, _holder) {
+			fs.writeFile(`./cache/${_id}.txt`, makeInstructions(_holder), err => {
+				if (err) {console.error(err);}
+			});
 		}
+		for (const [id, holder] of allArenas) {
+			instructionFunction(id, holder);
+			cleanMap(holder);
+			cleanImg(holder);
+		}
+		setTimeout(function() {bot.destroy();}, HELPTIMER*1.5);
+	}
+	else {
+		sendTemp(_links, process.env.ADMINPROMPT)
+	}
+	return false;
+}
+function doLog(_links, _command, _force = false) {//log [link code]/(->msg_to_log)--log
+	if (_force || _links.m.author.id === process.env.ADMINID) {
+		let ref = fetchReference(_links.m);
+		if (ref) {
+			ref.then((msg) => {console.log(msg);});
+		}
+		else if (_command.length > 1) {
+			switch (_command[1][0].toLowerCase()) {
+				case "m": console.log(_links.m); break;
+				case "c": console.log(_links.c); break;
+				case "g": console.log(_links.g); break;
+				case "t": console.log(_links.t); break;
+			}
+		}
+	}
+	else {
+		sendTemp(_links, process.env.ADMINPROMPT)
 	}
 	return false;
 }
 //------------------------------------USER
 //------------GENERAL
+function doPing(_links, _command) {//ping
+	sendTo(_links, `pong: ${Date.now()-_links.m.createdTimestamp} ms`);
+	return false;
+}
 const helpHelper = (function(_json){
 	let currentCategory;
 	for (const key in _json) {
@@ -556,7 +574,7 @@ function doDistance(_links, _command) {//distance ([coord]/[name] {i}) ([coord]/
 }
 function doInstructions(_links, _command) {//instructions
 	try {
-		makeInstructions(_links, fetchHolder(_links));
+		sendTo(_links, makeInstructions(fetchHolder(_links)));
 		return undefined;
 	} catch (e) { doFeedback(_links, _command, e); }
 }
@@ -840,7 +858,6 @@ const commandHelper = MultiMap.newMap([
 	[["editlight", "editdark"], doEditGroupLight],
 	[["ambient"], doEditAmbientLight]
 ]);
-
 async function mainSwitch(_links, _command, _flags) {
 	if (_command[0].startsWith(PREFIX)) {
 		_command[0] = _command[0].slice(PREFIX.length).toLowerCase()
@@ -849,15 +866,43 @@ async function mainSwitch(_links, _command, _flags) {
 			(function(_shouldDisplay){
 				if (_flags.display === undefined) {_flags.display = _shouldDisplay;}
 			})(await commandHelper.get(_command[0])(_links, _command));
-		} catch (e) { sendTemp(_links, `Unknown command: ${_command[0]}`); }
+		} catch (e) { throw e; sendTemp(_links, `Unknown command: ${_command[0]}`); }
 		if (_flags.delete === undefined) {_flags.delete = true;}
 	}
 	if (_command[0].toLowerCase().startsWith("keep")) {_flags.delete = false;}
 }
 
-bot.once("ready", () => {
+async function parseContent(_links, _content, _flags = {}) {
+	for (const messageLine of _content.split("\n")) {
+		await mainSwitch(_links, messageLine.split(" "), _flags);
+	}
+	if (_flags.display) {
+		(function(_holder){
+			if (_holder && _holder.arena) {displayMap(_links, _holder);}
+		})(fetchHolder(_links));
+	}
+	if (_flags.delete) {_links.m.delete().catch((error) => {});}
+}
+
+bot.once("ready", async () => {
 	console.log(`Logged in as ${bot.user.tag}`);
 	bot.user.setActivity("Ask me to --explain :D");
+
+	const cache = "./cache/";
+	fs.readdir(cache, (e_dir, files) => {
+		if (e_dir) { throw e_dir; }
+
+		for (const fileName of files) {
+			fs.readFile(cache + fileName, async (e_read, data) => {
+				if (e_read) { throw e_read; }
+
+				await parseContent({c: fetchChannel(fileName.split(".")[0])}, data.toString(), {delete: false});
+				fs.rm(cache + fileName, (e_rm) => {
+					if (e_rm) { throw e_rm; }
+				});
+			});
+		}
+	});
 });
 
 bot.on("messageCreate", async (_message) => {
@@ -874,17 +919,12 @@ bot.on("messageCreate", async (_message) => {
 			}
 			return _message;
 		})());
-
-		for (const messageLine of links.m.content.split("\n")) {
-			await mainSwitch(links, messageLine.split(" "), flags);
-		};
-		if (flags.display) {
-			(function(_holder){
-				if (_holder && _holder.arena) {displayMap(links, _holder);}
-			})(fetchHolder(links));
-		}
-		if (flags.delete) {links.m.delete().catch((error) => {});}
+		parseContent(links, links.m.content, flags);
 	}
 });
 //--------------------------------------------------------------------FINALIZE
 bot.login(process.env.TOKEN);
+
+process.on("SIGINT", () => {
+	doQuit({}, ["", "true"], true);
+});

@@ -1,4 +1,6 @@
 assets/placeholder/
 node_modules/
+cache/
+ssh/
 .env
 package-lock.json
