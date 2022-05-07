@@ -19,7 +19,9 @@ const bot = new Client({intents:[
 
 const allArenas = new Map();
 
-const HELPTIMER = 10000;
+const ONE_HOUR = 60*60*1000;
+const ONE_DAY = ONE_HOUR*24;
+const HELPTIMER = 20000;
 const PREFIX = "--";
 
 const SHORTCUTS = new Map([
@@ -32,6 +34,7 @@ const SHORTCUTS = new Map([
 	["w", "walls"],
 	["d", "default"]
 ]);
+Object.freeze(SHORTCUTS);
 const COLOURS = new Map([
 	["party", "#3f3"],
 	["allies", "#38f"],
@@ -42,7 +45,6 @@ const COLOURS = new Map([
 	["walls", "#000"],
 	["default", "#777"]
 ]);
-Object.freeze(SHORTCUTS);
 Object.freeze(COLOURS);
 //--------------------------------------------------------------------HELP
 //------------------------------------DISCORD
@@ -63,6 +65,12 @@ function fetchMessage(_idC, _idM) {
 }
 function fetchReference(_msg) {
 	return (_msg.reference === null) ? false : fetchMessage(_msg.reference.channelId, _msg.reference.messageId);
+}
+
+function cache(_id, _content) {
+	fs.writeFile(`./cache/${_id}.txt`, _content, err => {
+		if (err) {console.error(err);}
+	});
 }
 
 function sendTo(_links, _content) {
@@ -89,18 +97,84 @@ function cleanMap(_holder) {
 	}
 }
 function cleanImg(_holder) {
-	if (_holder.img) {
-		deleteFromDiscord(fetchMessage(_holder.img.parentId, _holder.img.id));
-		deleteFromDiscord(_holder.img);
-		_holder.img = false;
+	if (_holder.img) {_holder.img = false;}
+}
+
+function makeInstructions(_holder) {
+	let instructions = [];
+	if (_holder.arena) {
+		if (_holder.img) {instructions.push(`${PREFIX}image ${_holder.img.id}`)}
+		instructions.push(`${PREFIX}new ${Coord.unparse(_holder.arena.dim)}`)
+		for (const [name, group] of _holder.arena.groups) {
+			if (group.tokens.length > 0 && name !== "Background") {
+				let styles = new Map();
+				for (const [styleType, groupStyle] of Object.entries(group.style)) {
+					styles.set(styleType, (function(_id){
+						if (_id < 0) {return "none";}
+						for (const [styleName, style] of Object.entries(STYLES[styleType])) {
+							if (styleName !== "default" && _id === style.id) {return styleName;}
+						}
+					})(groupStyle.id));
+				}
+				let msgStyles = [];
+				for (const [layerName, styleName] of styles.entries()) {
+					if (layerName !== "light") {msgStyles.push(styleName);}
+				}
+				let csv = [];
+				let hidden = [];
+				let removed = [];
+				for (const [i, token] of group.tokens.entries()) {
+					csv.push(`${Range.unparse([[token.x, token.y, token.z], [token.h, token.v]])}`);
+					if (!token.visible) {hidden.push(i);}
+					if (token.removed) {removed.push(i);}
+				}
+				instructions.push(
+					`${PREFIX}custom ${group.layer} ${msgStyles.join(" ")} ` + `${group.colour} ${name} ${csv.join(",")}`
+				);
+				if (hidden.length > 0) {instructions.push(`${PREFIX}hide ${name} ${hidden.join(",")}`);}
+				if (removed.length > 0) {instructions.push(`${PREFIX}remove ${name} ${removed.join(",")}`);}
+				if (styles.get("light") !== "none") {
+					instructions.push(`${PREFIX}editlight ${name} ${group.radius} ${group.opacity}` +
+						((group.startFade !== undefined) ? " " + group.startFade.toString() : ""));
+				}
+			}
+		}
+		return instructions.join("\n");
 	}
+	return {display: false};
 }
 //------------------------------------WRAPPERS
-function newHolder(_links) {
-	allArenas.set(_links.c.id, {arena: false, map: false, img: false});
+function sendInstructions(_links, _instructions) {
+	sendTo(_links, process.env.CLEANSUCCESS + _instructions);
 }
+function cacheInstructions(_links, _instructions) {
+	cache(_links.c.id, _instructions);
+}
+
 function fetchHolder(_links) {
 	return allArenas.get(_links.c.id);
+}
+function cleanHolderActual(_links, _instructionFunction) {
+	let holder = fetchHolder(_links);
+
+	if (_instructionFunction !== undefined) {_instructionFunction(_links, makeInstructions(holder));}
+	cleanMap(holder);
+	cleanImg(holder);
+
+	allArenas.delete(_links.c.id);
+}
+function cleanHolderWarning(_links, _instructionFunction) {
+	let holder = fetchHolder(_links);
+
+	sendTemp(_links, process.env.CLEANWARNING);
+	clearTimeout(holder.timeout);
+	holder.timeout = setTimeout(function(){cleanHolderActual(_links, _instructionFunction);}, HELPTIMER);
+}
+function cleanTimeout(_links, _time = ONE_DAY, _instructionFunction = sendInstructions) {
+	return setTimeout(cleanHolderWarning, _time, _links, _instructionFunction);
+}
+function newHolder(_links) {
+	allArenas.set(_links.c.id, {arena: false, map: false, img: false, timeout: cleanTimeout(_links)});
 }
 function ensureHolder(_links) {
 	if (fetchHolder(_links) === undefined) {newHolder(_links);}
@@ -313,7 +387,7 @@ function doConeGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => orig
 }
 function doSpiderGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => origin] [group/posCSV => posLs]
 	let posLs = function(_group){
-		if (_group === undefined) {return false;}
+		if (_group === undefined) {return {};}
 		let out = [];
 		for (const token of _group.tokens) {
 			if (token.visible && !token.removed) {out.push([token.x, token.y, token.z]);}
@@ -327,96 +401,50 @@ function doSpiderGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => or
 }
 
 function doNewGroup(_links, _command, _layer, _styles) {//(v) [colour] [name] {rangeCSV} {visible}
-	try {
-		let arena = fetchArena(_links);
-		let name = Case.capital(_command[2]);
-		let rangeLs = (_command[3] === undefined) ? false : Range.parseCSV(_command[3]);
-		_styles.light = STYLES.general.none;
-		arena.newGroup(
-			_styles,
-			_layer,
-			name,
-			Colour.parse(_command[1]),
-			(rangeLs && rangeLs[0][1]) ? rangeLs[0][1] : [1,1]
-		);
-		if (rangeLs) {
-			arena.addToGroup(name, rangeLs, (_command[5] === undefined || _command[5][0].toLowerCase() !== "f"));
-			arena.shouldUpdate = true;
-			return true;
-		}
-		return undefined;
-	} catch (e) { doFeedback(_links, _command, e); }
+	let arena = fetchArena(_links);
+	let name = Case.capital(_command[2]);
+	let rangeLs = (_command[3] === undefined) ? false : Range.parseCSV(_command[3]);
+	_styles.light = STYLES.general.none;
+	arena.newGroup(
+		_styles,
+		_layer,
+		name,
+		Colour.parse(_command[1]),
+		(rangeLs && rangeLs[0][1]) ? rangeLs[0][1] : [1,1]
+	);
+	if (rangeLs) {
+		arena.addToGroup(name, rangeLs, (_command[5] === undefined || _command[5][0].toLowerCase() !== "f"));
+		arena.shouldUpdate = true;
+		return {display: true};
+	}
+	return {};
 }
 
 function doFeedback(_links, _command, e) {
 	sendTemp(_links, `Operation cancelled due to error: ${_command[0]}`);
 }
-
-function makeInstructions(_holder) {
-	let instructions = [];
-	if (_holder.arena) {
-		instructions.push(`${PREFIX}new ${Coord.unparse(_holder.arena.dim)}`)
-		for (const [name, group] of _holder.arena.groups) {
-			if (group.tokens.length > 0 && name !== "Background") {
-				let styles = new Map();
-				for (const [styleType, groupStyle] of Object.entries(group.style)) {
-					styles.set(styleType, (function(_id){
-						if (_id < 0) {return "none";}
-						for (const [styleName, style] of Object.entries(STYLES[styleType])) {
-							if (styleName !== "default" && _id === style.id) {return styleName;}
-						}
-					})(groupStyle.id));
-				}
-				let msgStyles = [];
-				for (const [layerName, styleName] of styles.entries()) {
-					if (layerName !== "light") {msgStyles.push(styleName);}
-				}
-				let csv = [];
-				let hidden = [];
-				let removed = [];
-				for (const [i, token] of group.tokens.entries()) {
-					csv.push(`${Range.unparse([[token.x, token.y, token.z], [token.h, token.v]])}`);
-					if (!token.visible) {hidden.push(i);}
-					if (token.removed) {removed.push(i);}
-				}
-				instructions.push(
-					`${PREFIX}custom ${group.layer} ${msgStyles.join(" ")} ` + `${group.colour} ${name} ${csv.join(",")}`
-				);
-				if (hidden.length > 0) {instructions.push(`${PREFIX}hide ${name} ${hidden.join(",")}`);}
-				if (removed.length > 0) {instructions.push(`${PREFIX}remove ${name} ${removed.join(",")}`);}
-				if (styles.get("light") !== "none") {
-					instructions.push(`${PREFIX}editlight ${name} ${group.radius} ${group.opacity}` +
-						((group.startFade !== undefined) ? " " + group.startFade.toString() : ""));
-				}
-			}
-		}
-		return instructions.join("\n");
-	}
-	return false;
-}
 //------------------------------------ADMIN
-function doQuit(_links, _command, _force = false) {//quit [make instructions]
+function doQuit(_links, _command, _force = false) {//quit {make instructions}
 	if (_force || _links.m.author.id === process.env.ADMINID) {
 		const instructionFunction = (_command[1] && _command[1][0].toLowerCase() === "f")
 		? function(){return;}
-		: function(_id, _holder) {
-			fs.writeFile(`./cache/${_id}.txt`, makeInstructions(_holder), err => {
-				if (err) {console.error(err);}
-			});
-		}
+		: function(_id, _holder){cache(_id, makeInstructions(_holder));}
 		for (const [id, holder] of allArenas) {
 			instructionFunction(id, holder);
 			cleanMap(holder);
 			cleanImg(holder);
 		}
-		setTimeout(function() {bot.destroy();}, HELPTIMER*1.5);
+		setTimeout(function() {
+			bot.destroy();
+			process.exit();
+		}, 1500);
 	}
 	else {
 		sendTemp(_links, process.env.ADMINPROMPT)
 	}
-	return false;
+	return {over:{delete: true, display: false, clean: false}};
 }
-function doLog(_links, _command, _force = false) {//log [link code]/(->msg_to_log)--log
+function doLog(_links, _command, _force = false) {//log [link code]/(->msg_to_log)log
 	if (_force || _links.m.author.id === process.env.ADMINID) {
 		let ref = fetchReference(_links.m);
 		if (ref) {
@@ -434,14 +462,15 @@ function doLog(_links, _command, _force = false) {//log [link code]/(->msg_to_lo
 	else {
 		sendTemp(_links, process.env.ADMINPROMPT)
 	}
-	return false;
+	return {display: false};
 }
 //------------------------------------USER
 //------------GENERAL
 function doPing(_links, _command) {//ping
 	sendTo(_links, `pong: ${Date.now()-_links.m.createdTimestamp} ms`);
-	return false;
+	return {};
 }
+
 const helpHelper = (function(_json){
 	let currentCategory;
 	for (const key in _json) {
@@ -478,44 +507,38 @@ const helpHelper = (function(_json){
 })(JSON.parse(fs.readFileSync("./help.json")));
 function doHelp(_links, _command) {//help ()/[command]
 	sendTemp(_links, helpHelper[(_command.length > 1) ? _command[1].toLowerCase() : "categories"].msg);
-	return false;
+	return {display:false};
 }
 async function doImage(_links, _command) {//image ()/(->msg_with_thread)--image
-	try {
-		let holder = ensureHolder(_links);
-		if (!holder.img) {
-			if (_links.t) {holder.img = _links.t;}
-			else {
-				holder.img = await sendTo(_links, process.env.THREADPROMPT).then((_prompt) => {
-					return _prompt.startThread({name: process.env.THREADNAME, autoArchiveDuration: 60});
-				});
-
-				if (_links.m.reference !== null) {
-					let anchor = await fetchReference(_links.m);
-					if (!anchor.hasThread) {return;}
-					fetchChannel(anchor.id).messages.fetch({limit:100}).then((_messages) => {
-						for (const [key, msg] of _messages) {
-							if (msg.attachments.size > 0) {
-								(holder.img).send({
-									content: msg.content,
-									files: [msg.attachments.entries().next().value[1]]
-								});
-							}
-						}
-					});
-				}
-			}
+	let holder = ensureHolder(_links);
+	if (!holder.img) {
+		if (_links.t) {
+			holder.img = _links.t;
 		}
-		else if (_links.t && _links.t.id === holder.img.id) {
-			cleanImg(holder);
+		else if (_command.length > 1) {
+			holder.img = await fetchChannel(_command[1]);
+		}
+		else if (_links.m.reference !== null) {
+			let anchor = await fetchReference(_links.m);
+			if (!anchor.hasThread) {return {};}
+			holder.img = await fetchChannel(anchor.id);
 		}
 		else {
-			holder.img.setArchived(false);
-			makeTemp(fetchMessage(_links.c.id, holder.img.id).then((_prompt) => {prompt.reply("bump");}));
+			holder.img = await sendTo(_links, process.env.IMGPROMPT).then((_anchor) => {
+				return _anchor.startThread({name: process.env.IMGNAME, autoArchiveDuration: 60});
+			});
 		}
-		if (holder.arena) {holder.arena.shouldUpdate = true;}
-		return false;
-	} catch (e) { doFeedback(_links, _command, e); }
+	}
+	else if (_links.t && _links.t.id === holder.img.id) {
+		cleanImg(holder);
+	}
+	else {
+		holder.img.setArchived(false);
+		makeTemp(fetchMessage(_links.c.id, holder.img.id).then((_anchor) => {_anchor.reply("bump");}));
+	}
+	if (holder.img) {sendTemp({c:holder.img}, process.env.IMGNOTIFY);}
+	if (holder.arena) {holder.arena.shouldUpdate = true;}
+	return {display: true};
 }
 //------------ARENA
 const guideHelper = MultiMap.newMap([
@@ -527,158 +550,136 @@ const guideHelper = MultiMap.newMap([
 	[["spider", "multiline"], doSpiderGuide]
 ]);
 function doGuide(_links, _command) {//guide ()/[shapeStr] {shapeArgs}
-	try {
-		let arena = fetchArena(_links);
-		if (_command.length > 1) {
-			guideHelper.get(_command[1].toLowerCase())(arena, _command);
-			arena.shouldUpdate = true;
-		}
-		arena.displayGuide();
-		return true;
-	} catch (e) { doFeedback(_links, _command, e); }
+	let arena = fetchArena(_links);
+	if (_command.length > 1) {
+		guideHelper.get(_command[1].toLowerCase())(arena, _command);
+		arena.shouldUpdate = true;
+	}
+	arena.displayGuide();
+	return {display: true};
 }
 function doList(_links, _command) {//list
-	try {
-		let msgMap = new Map();
-		for (const [key, teamName] of SHORTCUTS) {
-			msgMap.set(COLOURS.get(teamName), [`__Team: ${teamName} (${COLOURS.get(teamName)})__`]);
+	let msgMap = new Map();
+	for (const [key, teamName] of SHORTCUTS) {
+		msgMap.set(COLOURS.get(teamName), [`__Team: ${teamName} (${COLOURS.get(teamName)})__`]);
+	}
+	for (const [name, group] of fetchArena(_links).groups) {
+		if (msgMap.get(group.colour) === undefined) {
+			msgMap.set(group.colour, [`__Team: ${group.colour} (No affiliation)__`]);
 		}
-		for (const [name, group] of fetchArena(_links).groups) {
-			if (msgMap.get(group.colour) === undefined) {
-				msgMap.set(group.colour, [`__Team: ${group.colour} (No affiliation)__`]);
-			}
-			msgMap.get(group.colour).push(`Token: ${group.code} => Name: ${name}`);
+		msgMap.get(group.colour).push(`Token: ${group.code} => Name: ${name}`);
+	}
+	let msg = [];
+	if (_command.length == 1) {
+		for (const [team, ls] of msgMap) {
+			if (ls.length > 1) {msg.push(ls.join("\n"));}
 		}
-		let msg = [];
-		if (_command.length == 1) {
-			for (const [team, ls] of msgMap) {
-				if (ls.length > 1) {msg.push(ls.join("\n"));}
-			}
-		}
-		else {msg.push(msgMap.get(Colour.parse(_command[1])).join("\n"));}
-		sendTemp(_links, msg.join("\n\n"));
-		return undefined;
-	} catch (e) { doFeedback(_links, _command, e); }
+	}
+	else {msg.push(msgMap.get(Colour.parse(_command[1])).join("\n"));}
+	sendTemp(_links, msg.join("\n\n"));
+	return {};
 }
 function doDistance(_links, _command) {//distance ([coord]/[name] {i}) ([coord]/[name] {i})
-	try {
-		let arena = fetchArena(_links);
-		let coords = Coord.acceptToken(arena, _command, 1, 2);
-		let out = 0;
-		for (let j = 0; j<3; j++) {
-			out += (((coords[1][j]) ? coords[1][j] : 0) - ((coords[0][j]) ? coords[0][j] : 0))**2;
-		}
-		sendTemp(_links, Math.sqrt(out).toString());
-		return undefined;
-	} catch (e) { doFeedback(_links, _command, e); }
+	let arena = fetchArena(_links);
+	let coords = Coord.acceptToken(arena, _command, 1, 2);
+	let out = 0;
+	for (let j = 0; j<3; j++) {
+		out += (((coords[1][j]) ? coords[1][j] : 0) - ((coords[0][j]) ? coords[0][j] : 0))**2;
+	}
+	sendTemp(_links, Math.sqrt(out).toString());
+	return {};
 }
 function doInstructions(_links, _command) {//instructions
-	try {
-		sendTo(_links, makeInstructions(fetchHolder(_links)));
-		return undefined;
-	} catch (e) { doFeedback(_links, _command, e); }
+	sendTo(_links, makeInstructions(fetchHolder(_links)));
+	return {over: {timer: false}};
 }
 function doEditAmbientLight(_links, _command) {//ambient [a] / [r] [g] [b] {a} / rgb{a}CSV
-	try {
-		let layer = fetchArena(_links, true).layers.light;
-		let rgba = [];
-		for (const cmd of _command.slice(1)) {
-			rgba.push(...(function(_cmdSplit){
-				let out = [];
-				for (const val of _cmdSplit) {out.push(parseFloat(val, 10).toFixed(2));}
-				return out;
-			})(cmd.split(",")));
-		}
-		switch (rgba.length) {
-			case 1: layer.ambientOpacity = rgba[0]; break;
-			case 3: layer.makeShadow = LightLayer.makeShadowMaker(rgba); break;
-			case 4:
-				layer.makeShadow = LightLayer.makeShadowMaker(rgba.slice(0, 3));
-				layer.ambientOpacity = rgba[4];
-				break;
+	let layer = fetchArena(_links, true).layers.light;
+	let rgba = [];
+	for (const cmd of _command.slice(1)) {
+		rgba.push(...(function(_cmdSplit){
+			let out = [];
+			for (const val of _cmdSplit) {out.push(parseFloat(val, 10).toFixed(2));}
+			return out;
+		})(cmd.split(",")));
+	}
+	switch (rgba.length) {
+		case 1: layer.ambientOpacity = rgba[0]; break;
+		case 3: layer.makeShadow = LightLayer.makeShadowMaker(rgba); break;
+		case 4:
+			layer.makeShadow = LightLayer.makeShadowMaker(rgba.slice(0, 3));
+			layer.ambientOpacity = rgba[4];
+			break;
 
-			default: throw `doEditAmbientLight cannot take ${rgba.length} arguments.`
-		}
-		return true;
-	} catch (e) {doFeedback(_links, _command, e); }
+		default: throw `doEditAmbientLight cannot take ${rgba.length} arguments.`
+	}
+	return {display: true};
 }
 
 function doNewArena(_links, _command) {//new [coord: bottom-right]
-	try {
-		ensureHolder(_links).arena = new Arena(Coord.parse(_command[1]).slice(0,2), sendTemp, _links);
-		return true;
-	} catch (e) { doFeedback(_links, _command, e); }
+	ensureHolder(_links).arena = new Arena(Coord.parse(_command[1]).slice(0,2), sendTemp, _links);
+	return {over: {display: true}};
 }
 //------------GROUP
 function doMoveGroup(_links, _command) {//movegroup [name] [rangeCSV] {visible}
-	try {
-		const tokens = requireGroup(_links, _command[1], true).tokens;
-		let mode = (_command[3] === undefined) ? false : boolSwitch(_command[3], "u");
+	const tokens = requireGroup(_links, _command[1], true).tokens;
+	let mode = (_command[3] === undefined) ? false : boolSwitch(_command[3], "u");
 
-		let tokenInd = 0;
-		for (const range of Range.parseCSV(_command[2])) {
-			if (tokenInd >= tokens.length) {return;}
-			while (tokens[tokenInd].removed) {
-				if (++tokenInd >= tokens.length) {return;}
-			}
-			(function(_token){
-				_token.setPos(range[0]);
-				if (range[1]) {_token.setDim(range[1]);}
-				if (mode) {_token.visible = mode(_token.visible);}
-			})(tokens[tokenInd++]);
+	let tokenInd = 0;
+	for (const range of Range.parseCSV(_command[2])) {
+		if (tokenInd >= tokens.length) {return {};}
+		while (tokens[tokenInd].removed) {
+			if (++tokenInd >= tokens.length) {return {};}
 		}
-		return true;
-	} catch (e) { doFeedback(_links, _command, e); }
+		(function(_token){
+			_token.setPos(range[0]);
+			if (range[1]) {_token.setDim(range[1]);}
+			if (mode) {_token.visible = mode(_token.visible);}
+		})(tokens[tokenInd++]);
+		out = true;
+	}
+	return {display: true};
 }
 function doHideGroup(_links, _command) {//hidegroup [name] {mode}
-	try {
-		let mode = boolSwitch(_command[2], "!");
-		for (const token of requireGroup(_links, _command[1], true).tokens) {token.visible = mode(token.visible);}
-		return true;
-	} catch (e) { doFeedback(_links, _command, e); }
+	let mode = boolSwitch(_command[2], "!");
+	for (const token of requireGroup(_links, _command[1], true).tokens) {token.visible = mode(token.visible);}
+	return {display: true};
 }
 function doRemoveGroup(_links, _command) {//removegroup [name]
-	try {
-		let arena = fetchArena(_links);
-		return (function(_groupExisted){
-			if (_groupExisted) {
-				arena.shouldUpdate = true;
-				return true;
-			}
-			return undefined;
-		})(arena.removeGroup(Case.capital(_command[1])));
-	} catch (e) { doFeedback(_links, _command, e); }
+	let arena = fetchArena(_links);
+	const out = (function(_group){
+		return (_group && _group.tokens.length > 0);
+	})(arena.getGroup(Case.capital(_command[1])));
+	arena.removeGroup(Case.capital(_command[1]));
+	return {display: out};
 }
 function doResizeGroup(_links, _command) {//resizegroup [name] [dims] {origin}
-	try {
-		let group = requireGroup(_links, _command[1], true);
-		group.dim = (function(_range){
-			return (_range[1]) ? _range[1] : _range[0].slice(0,2);
-		})(Range.parse(_command[2]));
+	let group = requireGroup(_links, _command[1], true);
+	group.dim = (function(_range){
+		return (_range[1]) ? _range[1] : _range[0].slice(0,2);
+	})(Range.parse(_command[2]));
 
-		if (_command[3] && _command[3][0].toLowerCase() !== "f") {
-			let doResize = getDoResize(_command[3]);
-			for (const token of group.tokens) {doResize(token, group.dim);}
-		}
-		return true;
-	} catch (e) { doFeedback(_links, _command, e); }
+	if (_command[3] && _command[3][0].toLowerCase() !== "f") {
+		let doResize = getDoResize(_command[3]);
+		for (const token of group.tokens) {doResize(token, group.dim);}
+		return {display: true};
+	}
+	return {};
 }
 function doEditGroupLight(_links, _command) {//makelight [name] ()/([radius] [opacity] {startFade})
-	try {
-		let group = requireGroup(_links, _command[1], true);
-		if (_command.length > 3) {
-			group.radius = parseFloat(_command[2], 10);
-			group.opacity = parseFloat(_command[3], 10);
-			if (_command[4] !== undefined) {group.startFade = parseFloat(_command[4], 10);}
-		}
-		group.style.light = (function(_r, _o, _current){
-			return (
-				!(_r === undefined || isNaN(_r) || _o === undefined || isNaN(_o)) &&
-				(_current.id === STYLES.general.none.id || _command.length > 3)
-			);
-		})(group.radius, group.opacity, group.style.light) ? STYLES.light.gradient : STYLES.general.none;
-		return (group.tokens.length > 0);
-	} catch (e) { doFeedback(_links, _command, e); }
+	let group = requireGroup(_links, _command[1], true);
+	if (_command.length > 3) {
+		group.radius = parseFloat(_command[2], 10);
+		group.opacity = parseFloat(_command[3], 10);
+		if (_command[4] !== undefined) {group.startFade = parseFloat(_command[4], 10);}
+	}
+	group.style.light = (function(_r, _o, _current){
+		return (
+			!(_r === undefined || isNaN(_r) || _o === undefined || isNaN(_o)) &&
+			(_current.id === STYLES.general.none.id || _command.length > 3)
+		);
+	})(group.radius, group.opacity, group.style.light) ? STYLES.light.gradient : STYLES.general.none;
+	return {display: (group.tokens.length > 0)};
 }
 
 function doNewStaticGroup(_links, _command) {//RED> doNewGroup
@@ -773,67 +774,52 @@ function doNewCustomGroup(_links, _command) {//custom [layer] [token] [cell] [na
 }
 //------------TOKEN
 function doMoveToken(_links, _command) {//move [name] {iCSV} [rangeCSV] {visible}
-	try {
-		let group = requireGroup(_links, _command[1], true);
-		let [ranges, mode] = (function(_cmd){
-			let out = Range.parseCSV(_cmd);
-			if (out[0][0][0] === undefined) {return [false, boolSwitch(_cmd, "u")];}
-			return [out, false];
-		})(_command[_command.length - 1]);
-		if (!ranges) {ranges = Range.parseCSV(_command[_command.length - 2]);}
+	let group = requireGroup(_links, _command[1], true);
+	let [ranges, mode] = (function(_cmd){
+		let out = Range.parseCSV(_cmd);
+		if (out[0][0][0] === undefined) {return [false, boolSwitch(_cmd, "u")];}
+		return [out, false];
+	})(_command[_command.length - 1]);
+	if (!ranges) {ranges = Range.parseCSV(_command[_command.length - 2]);}
 
-		for (const [i, token] of fetchTokens(group, _command[2]).entries()) {
-			let range = ranges[i];
-			token.setPos(range[0]);
-			if (range[1]) {token.setDim(range[1]);}
-			if (mode) {token.visible = mode(token.visible);}
-		}
-		return true;
-	} catch (e) { doFeedback(_links, _command, e); }
+	for (const [i, token] of fetchTokens(group, _command[2]).entries()) {
+		let range = ranges[i];
+		token.setPos(range[0]);
+		if (range[1]) {token.setDim(range[1]);}
+		if (mode) {token.visible = mode(token.visible);}
+	}
+	return {display: true};
 }
 function doHideToken(_links, _command) {//hide [name] {iCSV} {mode}
-	try {
-		let group = requireGroup(_links, _command[1], true);
-		let mode = boolSwitch(_command[_command.length - 1], "!");
-		for (const token of fetchTokens(group, _command[2])) {token.visible = mode(token.visible);}
-		return true;
-	} catch (e) { doFeedback(_links, _command, e); }
+	let group = requireGroup(_links, _command[1], true);
+	let mode = boolSwitch(_command[_command.length - 1], "!");
+	for (const token of fetchTokens(group, _command[2])) {token.visible = mode(token.visible);}
+	return {display: true};
 }
 function doRemoveToken(_links, _command) {//remove [name] {iCSV} {mode} {andGroup}
-	try {
-		let group = requireGroup(_links, _command[1], true);
-		let mode = boolSwitch(_command[_command.length - 1], "t");
-		for (const token of fetchTokens(group, _command[2])) {token.removed = mode(token.removed);}
+	let group = requireGroup(_links, _command[1], true);
+	let mode = boolSwitch(_command[_command.length - 1], "t");
+	for (const token of fetchTokens(group, _command[2])) {token.removed = mode(token.removed);}
 
-		if (_command[4] && _command[4][0].toLowerCase() === "t" && group.isEmpty()) {doRemoveGroup(_command[1]);}
-		return true;
-	} catch (e) { doFeedback(_links, _command, e); }
+	if (_command[4] && _command[4][0].toLowerCase() === "t" && group.isEmpty()) {doRemoveGroup(_command[1]);}
+	return {display: true};
 }
 
 function doNewToken(_links, _command) {//copy [name] [rangeCSV] {visible}
-	try {
-		fetchArena(_links, true).addToGroup(
-			Case.capital(_command[1]),
-			Range.parseCSV(_command[2]),
-			(_command[3] === undefined || _command[3][0].toLowerCase() !== "f")
-		);
-		return true;
-	} catch (e) { doFeedback(_links, _command, e); }
-}
-//--------------------------------------------------------------------TESTING
-async function doTest(_links, _command) {
-
+	fetchArena(_links, true).addToGroup(
+		Case.capital(_command[1]),
+		Range.parseCSV(_command[2]),
+		(_command[3] === undefined || _command[3][0].toLowerCase() !== "f")
+	);
+	return {display: true};
 }
 //--------------------------------------------------------------------MAIN
 const commandHelper = MultiMap.newMap([
-	[["test"], doTest],
 	[["quit"], doQuit],
-	[["ping"], doPing],
 	[["log"], doLog],
+	[["ping"], doPing],
 	[["help", "explain"], doHelp],
 	[["image", "thread"], doImage],
-	[["map", "display"], function(_l, _c){return true;}],
-	[["nomap", "hidden"], function(_l, _c){return false;}],
 	[["new", "arena"], doNewArena],
 	[["guide", "preview"], doGuide],
 	[["list", "tokens"], doList],
@@ -856,30 +842,43 @@ const commandHelper = MultiMap.newMap([
 	[["hide", "reveal"], doHideToken],
 	[["remove"], doRemoveToken],
 	[["editlight", "editdark"], doEditGroupLight],
-	[["ambient"], doEditAmbientLight]
+	[["ambient"], doEditAmbientLight],
+	[["keep"], function(_l, _c){return {over: {delete: false}};}],
+	[["map", "display"], function(_l, _c){return {over: {display: true}};}],
+	[["nomap", "hidden"], function(_l, _c){return {over: {display: false}};}],
+	[["clean", "finished"], function(_l, _c){return {over: {timer: 500}};}]
 ]);
 async function mainSwitch(_links, _command, _flags) {
 	if (_command[0].startsWith(PREFIX)) {
 		_command[0] = _command[0].slice(PREFIX.length).toLowerCase()
 		console.log(_command);
 		try {
-			(function(_shouldDisplay){
-				if (_flags.display === undefined) {_flags.display = _shouldDisplay;}
-			})(await commandHelper.get(_command[0])(_links, _command));
-		} catch (e) { throw e; sendTemp(_links, `Unknown command: ${_command[0]}`); }
+			for (const [key, val] of Object.entries(await commandHelper.get(_command[0])(_links, _command))) {
+				if (_flags[key] === undefined) {_flags[key] = val;}
+				else if (key === "over") {
+					for (const [keyOver, valOver] of Object.entries(val)) {
+						_flags[keyOver] = valOver;
+					}
+				}
+			}
+		} catch (e) { doFeedback(_links, _command, e); }
 		if (_flags.delete === undefined) {_flags.delete = true;}
+		if (_flags.timer === undefined) {_flags.timer = ONE_HOUR;}
 	}
-	if (_command[0].toLowerCase().startsWith("keep")) {_flags.delete = false;}
 }
 
 async function parseContent(_links, _content, _flags = {}) {
+	_flags.over = {};
 	for (const messageLine of _content.split("\n")) {
 		await mainSwitch(_links, messageLine.split(" "), _flags);
 	}
-	if (_flags.display) {
-		(function(_holder){
-			if (_holder && _holder.arena) {displayMap(_links, _holder);}
-		})(fetchHolder(_links));
+	const holder = fetchHolder(_links);
+	if (holder && holder.arena) {
+		if (_flags.display) {displayMap(_links, holder);}
+		if (_flags.timer) {
+			clearTimeout(holder.timeout);
+			holder.timeout = cleanTimeout(_links, _flags.timer);
+		}
 	}
 	if (_flags.delete) {_links.m.delete().catch((error) => {});}
 }
