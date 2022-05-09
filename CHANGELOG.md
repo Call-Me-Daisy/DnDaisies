@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.2
+### Major changes
+  - None
+### Minor changes
+  - A display error will now stop the instruction list and previous map from being deleted (so you don't need to retype the whole thing for one tiny change)
+  - Note, however, that the instruction list has been applied to the arena - it just won't display the new arena until it is valid.
+### Deprecated
+  - None
+### Bugfix
+  - None
+
 ## v1.0.1
 ### Major changes
   - Added catch on call to arena.buildMap so that incorrect arena dimensions are not fatal.

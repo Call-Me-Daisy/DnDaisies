@@ -1,6 +1,6 @@
 {
   "name": "dndaisies",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Create interactive token maps to help visualise your favourite tabletop games within Discord! ",
   "main": "main.js",
   "scripts": {

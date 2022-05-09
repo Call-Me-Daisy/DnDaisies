@@ -851,37 +851,38 @@ async function parseContent(_links, _content, _flags = {}) {
 		await mainSwitch(_links, messageLine.split(" "), _flags);
 	}
 	const holder = fetchHolder(_links);
+	let flagChange = false;
 	if (holder && holder.arena) {
 		if (_flags.timer) {
 			clearTimeout(holder.timeout);
 			holder.timeout = cleanTimeout(_links, _flags.timer);
 		}
 		if (_flags.display) {
-			cleanMap(holder);
-
-			const imgUrls = (async function(){
-				if (!holder.img) {return false;}
-				let out = new Map();
+			let imgUrls = false;
+			if (holder.img) {
+				imgUrls = new Map();
 				for (const [key, msg] of await holder.img.messages.fetch({limit:100})) {
 					if (msg.attachments.size > 0) {
 						out.set(Case.capital(msg.content), msg.attachments.entries().next().value[1].url);
 					}
 				}
-				return out;
-			})();
+			}
 
-			holder.arena.buildMap(await imgUrls)
+			flagChange = holder.arena.buildMap(await imgUrls)
 			.then((_map) => {
 				cleanMap(holder);
 				sendTo(_links, {files: [new MessageAttachment(_map, _links.c.id + "_map.png")]}).then((_msg) => {
 					holder.map = _msg;
 				});
+				return false;
 			})
 			.catch((_err) => {
-				sendTemp(_links, "Error displaying map. Common issues:\n - Incorrectly entered coordinates for --new");
+				sendTemp(_links, "Error rebuilding map. Common issues:\n - Incorrectly entered coordinates for --new");
+				return _flags.delete = false;
 			});
 		}
 	}
+	await flagChange;
 	if (_flags.delete) {_links.m.delete().catch((error) => {});}
 }
 
