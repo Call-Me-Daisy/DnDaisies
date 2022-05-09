@@ -89,12 +89,13 @@ class Arena {
 			};
 		})(this.base.brush.pS)
 
-		this.newGroup({
-			token: STYLES.token.image,
-			cell: STYLES.cell.rect,
-			name: STYLES.general.none,
-			light: STYLES.general.none
-		},
+		this.newGroup(
+			{
+				token: STYLES.token.image,
+				cell: STYLES.cell.rect,
+				name: STYLES.general.none,
+				light: STYLES.general.none
+			},
 			0, "Background", "#000", _dim
 		);
 		this.addToGroupSplit("Background", [1,1,0]);
@@ -203,7 +204,7 @@ class Arena {
 
 		this.shouldUpdate = false;
 
-		return ctx.canvas.toBuffer("image/png");
+		return this.base.canvas.toBuffer("image/png");
 	}
 }
 //--------------------------------------------------------------------FINALIZE

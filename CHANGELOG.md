@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.1
+### Major changes
+  - Added catch on call to arena.buildMap so that incorrect arena dimensions are not fatal.
+### Minor changes
+  - None
+### Deprecated
+  - displayMap. Code has been inserted into parseContent to better facilitate changes to _flags on display error
+### Bugfix
+  - None
+
 ## v1.0.0
 ### Major changes
   - Release! Woo!

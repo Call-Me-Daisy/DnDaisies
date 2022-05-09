@@ -198,28 +198,6 @@ function fetchTokens(_group, _iCSV) {
 	}
 	return out;
 }
-
-async function displayMap(_links, _holder) {
-	cleanMap(_holder);
-
-	let imgUrls = (async function(){
-		if (!_holder.img) {return false;}
-		let out = new Map();
-		for (const [key, msg] of await _holder.img.messages.fetch({limit:100})) {
-			if (msg.attachments.size > 0) {
-				out.set(Case.capital(msg.content), msg.attachments.entries().next().value[1].url);
-			}
-		}
-		return out;
-	})();
-
-	_holder.arena.buildMap(await imgUrls).then((_map) => {
-		cleanMap(_holder);
-		sendTo(_links, {files: [new MessageAttachment(_map, _links.c.id + "_map.png")]}).then((_msg) => {
-			_holder.map = _msg;
-		});
-	});
-}
 //------------------------------------MODES
 function boolSwitch(_str, _default = "u") {
 	switch ((typeof(_str) === "string") ? _str[0].toLowerCase() : _default) {
@@ -874,10 +852,34 @@ async function parseContent(_links, _content, _flags = {}) {
 	}
 	const holder = fetchHolder(_links);
 	if (holder && holder.arena) {
-		if (_flags.display) {displayMap(_links, holder);}
 		if (_flags.timer) {
 			clearTimeout(holder.timeout);
 			holder.timeout = cleanTimeout(_links, _flags.timer);
+		}
+		if (_flags.display) {
+			cleanMap(holder);
+
+			const imgUrls = (async function(){
+				if (!holder.img) {return false;}
+				let out = new Map();
+				for (const [key, msg] of await holder.img.messages.fetch({limit:100})) {
+					if (msg.attachments.size > 0) {
+						out.set(Case.capital(msg.content), msg.attachments.entries().next().value[1].url);
+					}
+				}
+				return out;
+			})();
+
+			holder.arena.buildMap(await imgUrls)
+			.then((_map) => {
+				cleanMap(holder);
+				sendTo(_links, {files: [new MessageAttachment(_map, _links.c.id + "_map.png")]}).then((_msg) => {
+					holder.map = _msg;
+				});
+			})
+			.catch((_err) => {
+				sendTemp(_links, "Error displaying map. Common issues:\n - Incorrectly entered coordinates for --new");
+			});
 		}
 	}
 	if (_flags.delete) {_links.m.delete().catch((error) => {});}
