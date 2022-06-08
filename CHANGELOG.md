@@ -1,5 +1,35 @@
 # Changelog
 
+## v2.0.0
+### Major changes
+  - Added much-needed error-catching and -prevention methods, so it doesn't crash all the time
+  - Implemented extender.js to support extending the bot for other ttgs:
+  	- Extensions can define any number of...
+		parsers - objects which convert user inputs into a form the machine can understand
+		layers - sections of the map specialised to display some particular aspect(s)
+  	- Extensions can register any number of...
+		COMMANDS - functions called directly by the user; names of these functions must be **entirely** lowercase
+		CONSOLES - specialised function automatically called by a core function for some known task
+		STYLES - ways tokens/guides/etc can be displayed upon the map
+	- Extensions should register **one** builder function for their Arena under CONSOLES.arena
+	- Extensions should register **one** function to add group(s) to their Arena under CONSOLES.newGroup
+	- Significantly improved versatility of flags in parseMessage
+	- Added wider support for macros like parse and (now) quit
+	- Holders are automatically reclaimed when a guild is left/deleted
+### Minor changes
+  - Holder has become a class to reduce repeated code
+  - Rotated coordinate system
+  - Pushed more of the actual computation to Arena.js for better extensibility
+  - Added (arena-dependant) command to resize current arena
+  - map-layer.js refactored to arena-layer.js
+  - styles from styles.js have been split between the core and dnd extensions
+### Deprecated (Y/N/? => will be re-implemented)
+  - ?: guide.spider
+  - Y: Help/explain system & commands
+  - Y: Command feedback
+### Bugfix
+  - N/A
+
 ## v1.0.2
 ### Major changes
   - None

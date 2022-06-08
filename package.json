@@ -1,17 +1,26 @@
 {
   "name": "dndaisies",
-  "version": "1.0.2",
-  "description": "Create interactive token maps to help visualise your favourite tabletop games within Discord! ",
+  "version": "2.0.0",
+  "description": "Create interactive token maps to help visualise your favourite tabletop games within Discord!",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "run": "node main.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TDCalverley99/DnDaisies.git"
+  },
   "author": "TDCalverley99",
   "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TDCalverley99/DnDaisies/issues"
+  },
+  "homepage": "https://github.com/TDCalverley99/DnDaisies#readme",
   "dependencies": {
-    "canvas": "^2.8.0",
-    "discord.js": "^13.6.0",
-    "dotenv": "^12.0.4"
+    "canvas": "^2.9.1",
+    "cmdaisy-utils": "^2.6.0",
+    "discord.js": "^13.7.0",
+    "dotenv": "^16.0.1"
   }
 }

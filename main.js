@@ -1,932 +1,392 @@
 require("dotenv").config();
 
-const {Client, Intents, MessageAttachment, ThreadChannel} = require("discord.js");
-const {createCanvas, loadImage} = require("canvas");
 const fs = require("fs");
+const {Intents, MessageAttachment, TextChannel, ThreadChannel} = require("discord.js");
 
-const {MultiMap, TreeMap} = require("./utils");
-const {Arena} = require("./arena");
-const {LightLayer} = require("./map-layer");
-const {STYLES} = require("./styles");
-//--------------------------------------------------------------------GLOBALS
-const bot = new Client({intents:[
-    Intents.FLAGS.GUILDS,
-    Intents.FLAGS.GUILD_MESSAGES,
-    Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
-    Intents.FLAGS.DIRECT_MESSAGES,
-    Intents.FLAGS.DIRECT_MESSAGE_REACTIONS
-]});
+const [{sliceArgs}, {DiscordBot, DiscordCleaner}] = require("cmdaisy-utils").unpack("general", "discord");
 
-const allArenas = new Map();
-
-const ONE_HOUR = 60*60*1000;
-const ONE_DAY = ONE_HOUR*24;
-const HELPTIMER = 20000;
+const {minorUtils} = require("./utils");
+const {COMMANDS, CONSOLES} = require("./extender");
+//--------------------------------------------------------------------CONSTANTS
 const PREFIX = "--";
+const instructionDir = "./cache/";
 
-const SHORTCUTS = new Map([
-	["p", "party"],
-	["a", "allies"],
-	["e", "enemies"],
-	["n", "neutrals"],
-	["o", "objects"],
-	["b", "background"],
-	["w", "walls"],
-	["d", "default"]
-]);
-Object.freeze(SHORTCUTS);
-const COLOURS = new Map([
-	["party", "#3f3"],
-	["allies", "#38f"],
-	["enemies", "#f33"],
-	["neutrals", "#640"],
-	["objects", "#848b94"],
-	["background", "#a38b53"],
-	["walls", "#000"],
-	["default", "#777"]
-]);
-Object.freeze(COLOURS);
-//--------------------------------------------------------------------HELP
-//------------------------------------DISCORD
-async function deleteFromDiscord(_obj) {
-	(await _obj).delete().catch((e) => {});
-}
-function makeTemp(_msg, _duration = HELPTIMER) {
-	_msg.then((msg) => {
-		setTimeout(() => {deleteFromDiscord(msg);}, _duration);
-	});
-}
+const bot = new DiscordBot({intents: [
+	Intents.FLAGS.GUILDS,
+	Intents.FLAGS.GUILD_MESSAGES
+]});
+//--------------------------------------------------------------------HOLDER
+class Holder {
+	static collection = new Map();
+	static defaultTimer = 1000*60*60*2; //2 hours
 
-function fetchChannel(_idC) {
-	return bot.channels.cache.get(_idC);
-}
-function fetchMessage(_idC, _idM) {
-	return fetchChannel(_idC).messages.fetch(_idM);
-}
-function fetchReference(_msg) {
-	return (_msg.reference === null) ? false : fetchMessage(_msg.reference.channelId, _msg.reference.messageId);
-}
-
-function cache(_id, _content) {
-	fs.writeFile(`./cache/${_id}.txt`, _content, err => {
-		if (err) {console.error(err);}
-	});
-}
-
-function sendTo(_links, _content) {
-	return _links.c.send(_content);
-}
-function sendTemp(_links, _content, _duration = HELPTIMER) {
-	makeTemp(sendTo(_links, _content), _duration);
-}
-
-function buildLinks(_msg) {
-	let inThread = (_msg.channel instanceof ThreadChannel);
-	return {
-		g: _msg.guild,
-		c: (inThread) ? fetchChannel(_msg.channel.parentId) : _msg.channel,
-		t: (inThread) ? _msg.channel : false,
-		m: _msg
-	};
-}
-
-function cleanMap(_holder) {
-	if (_holder.map) {
-		deleteFromDiscord(_holder.map);
-		_holder.map = false;
+	static get(_channelId) {
+		return Holder.collection.get(_channelId);
 	}
-}
-function cleanImg(_holder) {
-	if (_holder.img) {_holder.img = false;}
-}
+	static fetch(_channel) {
+		return Holder.get(((_channel instanceof ThreadChannel) ? bot.fetchCachedChannel(_channel.parentId) : _channel).id);
+	}
+	static ensure(_channel) {
+		return Holder.fetch(_channel) || new Holder(_channel);
+	}
+	static require(_channel) {
+		const out = Holder.fetch(_channel);
+		if (out === undefined) { throw `Required Holder, ${_channel.id}, is undefined`; }
+		return out;
+	}
 
-function makeInstructions(_holder) {
-	let instructions = [];
-	if (_holder.arena) {
-		if (_holder.img) {instructions.push(`${PREFIX}image ${_holder.img.id}`)}
-		instructions.push(`${PREFIX}new ${Coord.unparse(_holder.arena.dim)}`)
-		for (const [name, group] of _holder.arena.groups) {
-			if (group.tokens.length > 0 && name !== "Background") {
-				let styles = new Map();
-				for (const [styleType, groupStyle] of Object.entries(group.style)) {
-					styles.set(styleType, (function(_id){
-						if (_id < 0) {return "none";}
-						for (const [styleName, style] of Object.entries(STYLES[styleType])) {
-							if (styleName !== "default" && _id === style.id) {return styleName;}
-						}
-					})(groupStyle.id));
-				}
-				let msgStyles = [];
-				for (const [layerName, styleName] of styles.entries()) {
-					if (layerName !== "light") {msgStyles.push(styleName);}
-				}
-				let csv = [];
-				let hidden = [];
-				let removed = [];
-				for (const [i, token] of group.tokens.entries()) {
-					csv.push(`${Range.unparse([[token.x, token.y, token.z], [token.h, token.v]])}`);
-					if (!token.visible) {hidden.push(i);}
-					if (token.removed) {removed.push(i);}
-				}
-				instructions.push(
-					`${PREFIX}custom ${group.layer} ${msgStyles.join(" ")} ` + `${group.colour} ${name} ${csv.join(",")}`
-				);
-				if (hidden.length > 0) {instructions.push(`${PREFIX}hide ${name} ${hidden.join(",")}`);}
-				if (removed.length > 0) {instructions.push(`${PREFIX}remove ${name} ${removed.join(",")}`);}
-				if (styles.get("light") !== "none") {
-					instructions.push(`${PREFIX}editlight ${name} ${group.radius} ${group.opacity}` +
-						((group.startFade !== undefined) ? " " + group.startFade.toString() : ""));
-				}
-			}
+	static async clean(_holder, _shouldCache = false) {
+		const instructions = _holder.makeInstructionList();
+		if (instructions) {
+			(_shouldCache)
+				? fs.writeFile(instructionDir + `${_holder.channel.id}.txt`, instructions, (err) => {err && console.error(err)})
+				: minorUtils.makeTemp(_holder.channel.send("This instruction list is temporary:\n" + instructions))
+			;
 		}
-		return instructions.join("\n");
+
+		clearTimeout(_holder.cleanup);
+		await _holder.cleanMap();
+		await _holder.revokeThread(!_shouldCache);
+
+		Holder.collection.delete(_holder.channel.id);
 	}
-	return {display: false};
-}
-//------------------------------------WRAPPERS
-function sendInstructions(_links, _instructions) {
-	sendTo(_links, process.env.CLEANSUCCESS + _instructions);
-}
-function cacheInstructions(_links, _instructions) {
-	cache(_links.c.id, _instructions);
-}
-
-function fetchHolder(_links) {
-	return allArenas.get(_links.c.id);
-}
-function cleanHolderActual(_links, _instructionFunction) {
-	let holder = fetchHolder(_links);
-
-	if (_instructionFunction !== undefined) {_instructionFunction(_links, makeInstructions(holder));}
-	cleanMap(holder);
-	cleanImg(holder);
-
-	allArenas.delete(_links.c.id);
-}
-function cleanHolderWarning(_links, _instructionFunction) {
-	let holder = fetchHolder(_links);
-
-	sendTemp(_links, process.env.CLEANWARNING);
-	clearTimeout(holder.timeout);
-	holder.timeout = setTimeout(function(){cleanHolderActual(_links, _instructionFunction);}, HELPTIMER);
-}
-function cleanTimeout(_links, _time = ONE_DAY, _instructionFunction = sendInstructions) {
-	return setTimeout(cleanHolderWarning, _time, _links, _instructionFunction);
-}
-function newHolder(_links) {
-	allArenas.set(_links.c.id, {arena: false, map: false, img: false, timeout: cleanTimeout(_links)});
-}
-function ensureHolder(_links) {
-	if (fetchHolder(_links) === undefined) {newHolder(_links);}
-	return fetchHolder(_links);
-}
-
-function fetchArena(_links, _update = false) {
-	const arena = fetchHolder(_links).arena;
-	if (_update) {arena.shouldUpdate = true;}
-	return arena;
-}
-function requireGroup(_links, _nameRaw, _update) {
-	return fetchArena(_links, _update).requireGroup(Case.capital(_nameRaw));
-}
-function fetchTokens(_group, _iCSV) {
-	if (_group.tokens.length === 1) {return [_group.tokens[0]];}
-	let out = [];
-	for (const i of _iCSV.split(",")) {
-		if (isNaN(i)) {throw `Index ${i} is not a number.`;}
-		out.push(_group.tokens[parseInt(i, 10)]);
+	static setCleanTimer(_holder, _timer = Holder.defaultTimer) {
+		clearTimeout(_holder.cleanup);
+		_holder.cleanup = setTimeout(Holder.clean, _timer, _holder);
 	}
+
+	constructor(_channel) {
+		this.channel = _channel;
+
+		this.arena = false;
+		this.cleanup = false;
+		this.map = false;
+		this.thread = false;
+
+		Holder.setCleanTimer(this, 2000);
+		Holder.collection.set(_channel.id, this);
+	}
+
+	makeInstructionList() {
+		if (!this.arena) {return false;}
+		const commands = this.arena.makeCommandList(...arguments);
+		return commands && [""].concat((this.thread) ? [`thread ${this.thread.id}`] : []).concat(commands).join(`\n${PREFIX}`);
+	}
+
+	sendMap() {
+		this.arena.buildMap(this.thread).then((_map) => {
+			this.channel.send({
+				files: [new MessageAttachment(_map, this.channel.id + "_map.png")]
+			}).then(async (_msg) => {
+				await this.cleanMap();
+				this.map = _msg;
+			});
+		});
+	}
+	cleanMap() {
+		return this.map && DiscordCleaner.delete(this.map);
+	}
+
+	claimThread(_thread, _notify = true) {
+		this.revokeThread();
+		this.thread = _thread;
+		_notify && minorUtils.makeTemp(this.thread.send("TO_DO: NOTIFY CLAIM THREAD"));
+	}
+	revokeThread(_notify = true) {
+		if (!this.thread) {return false;}
+		_notify && minorUtils.makeTemp(this.thread.send("TO_DO: NOTIFY REVOKE THREAD"));
+		this.thread = false;
+		return true;
+	}
+}
+//--------------------------------------------------------------------MACROS
+function doLog(_msg, _key) {
+	let toLog;
+	if (_key) {
+		console.log((function(_lckey){
+			switch (_lckey[0]) {
+				case "c": return _msg.channel;
+				case "g":
+					return (_lckey[1] === "c") ? _msg.guild.channels : _msg.guild;
+
+				default: return _msg;
+			}
+		})(_key.toLowerCase()));
+	}
+	else if (_msg.reference !== null) {
+		bot.fetchReference(_msg).then((_ref) => {console.log(_ref);});
+	}
+	else {
+		console.error(`log macro did nothing`);
+	}
+}
+function doClearMessages(_msg, _limit = 100) {
+	_msg.channel.messages.fetch({limit: _limit}).then((_fetchedMsg) => {
+		const notPinned = _fetchedMsg.filter((message) => !(message.pinned || bot.fetchCachedChannel(message.id)));
+		_msg.channel.bulkDelete(notPinned, true);
+	}).catch(err => console.error(err));
+}
+function doQuit() {
+	for (const [id, holder] of Holder.collection.entries()) {Holder.clean(holder, true);}
+	setTimeout(function() {bot.destroy();}, 1500);
+}
+
+function doTest(_msg) {
+
+}
+
+const fetchRequirement = {
+	bot: function(_msg) {return bot;},
+	message: function(_msg) {return _msg;},
+	holder: function(_msg) {return Holder.require(_msg.channel);},
+	arena: function(_msg) {
+		const out = Holder.fetch(_msg.channel).arena;
+		if (!out) { throw `Required Arena, ${_channel.id}, is undefined`; }
+		return out;
+	}
+};
+//--------------------------------------------------------------------COMMANDS
+//------------------------------------FLAGS
+COMMANDS.registerType("flags");
+COMMANDS.register("flags", "delete", function() {return {force: {delete: true}}});
+COMMANDS.register("flags", "keep", function() {return {force: {delete: false}}});
+
+COMMANDS.register("flags", "display", function() {return {force: {update: true, display: true}}});
+COMMANDS.register("flags", "hidden", function() {return {force: {update: false, display: false}}});
+
+COMMANDS.register("flags", "clean", function() {return {force: {timer: 1000}, suggest: {display: false}}});
+COMMANDS.register("flags", "extend", function() {return {force: {timer: Holder.defaultTimer}, suggest: {display: false}}});
+//------------------------------------TOOLS
+COMMANDS.register("tools", "explain", function(_msg, _key) {
+
+}).requires = ["message"];
+
+COMMANDS.register("tools", "arena", function(_msg, _arenaType) {
+	const arenaType = _arenaType.toLowerCase();
+	const arenaBuilder = CONSOLES.arena[arenaType];
+	if (!arenaBuilder) { throw `Arena type, ${_arenaType}, is undefined`; }
+
+	const holder = Holder.ensure(_msg.channel);
+	holder.arena = new arenaBuilder(...sliceArgs(arguments, 2));
+	holder.arenaType = arenaType;
+}).requires = ["message"];
+COMMANDS.register("tools", "thread", async function(_msg, _channelId) {
+	const holder = Holder.ensure(_msg.channel);
+
+	if (!(holder.thread && (holder.thread = await bot.fetchChannel(holder.thread.id)))) {
+		let foo;
+		if (_msg.channel instanceof ThreadChannel) {
+			holder.claimThread(_msg.channel);
+		}
+		else if (_channelId && (foo = await bot.fetchChannel(_channelId)) instanceof ThreadChannel) {
+			holder.claimThread(foo);
+		}
+		else if (_msg.reference !== null && (foo = await bot.fetchReference(_msg))) {
+			holder.claimThread(await bot.fetchChannel(foo.id));
+		}
+		else if (foo = await _msg.channel.threads.cache.find(x => x.name = "DnDaisies_Thread")) {
+			holder.claimThread(foo);
+		}
+		else {
+			holder.claimThread(await holder.channel.send("TO_DO: New Thread Prompt").then((_anchor) => {
+				return _anchor.startThread({name: "DnDaisies_Thread", autoArchiveDuration: 60});
+			}));
+			return {suggest: {display: false}};
+		}
+		holder.arena && holder.arena.updateGroupLayers();
+		return;
+	}
+	if (_msg.channel.id !== holder.thread.id) {
+		holder.thread.setArchived(false);
+		minorUtils.makeTemp(bot.fetchMessage(holder.channel.id, holder.thread.id).then((_anchor) => {
+			return _anchor && _anchor.reply("bump");
+		}));
+		return {suggest: {display: false}};
+	}
+
+	holder.revokeThread();
+	return {suggest: {display: holder.arena && holder.arena.updateGroupLayers()}};
+}).requires = ["message"];
+
+COMMANDS.register("tools", "showguide", function(_arena) {
+	return {suggest: {display: _arena.showGuide(...sliceArgs(arguments, 1)).hasShape()}};
+}).requires = ["arena"];
+COMMANDS.register("tools", "addguide", function(_holder, _arena, _guideType) {
+	const guideBuilder = CONSOLES.guide[_guideType.toLowerCase()];
+	if (guideBuilder === undefined) { throw `GuideType, ${_guideType}, is undefined`; }
+
+	_arena.addGuide(...guideBuilder(_arena, ...sliceArgs(arguments, 3)));
+}).requires = ["holder", "arena"];
+COMMANDS.register("tools", "setguide", function(_holder, _arena, _guideType) {
+	_arena.clearGuide();
+	if (_guideType === undefined) {return {suggest: {display: false}};}
+
+	COMMANDS.tools.addguide(...arguments);
+}).requires = ["holder", "arena"];
+
+COMMANDS.register("tools", "resizearena", function(_holder, _arena, _w, _h, _dx, _dy) {
+	if (!_arena.canResize) { throw `Arena Type ${_holder.arenaType} cannot be resized`; }
+	const w = parseInt(_w, 10);
+	const h = parseInt(_h, 10);
+	if (isNaN(w) || isNaN(h)) { throw `Invalid new dimensions: [${_w}, ${_h}]`; }
+
+	const instructions = _holder.makeInstructionList(w, h, _dx && parseInt(_dx, 10), _dy && parseInt(_dy, 10));
+	if (!instructions) { throw `Cannot generate instructions for arena ${_holder.channel.id} to be resized`; }
+
+	_holder.channel.send(instructions + `\n${PREFIX}display`).then((_msg) => {
+		parseMessage(_msg, {delete: true});
+	});
+	return {force: {update: false, display: false, delete: true}};
+}).requires = ["holder", "arena"];
+//------------------------------------ALIAS
+COMMANDS.addAliases("flags", "display", "map");
+COMMANDS.addAliases("flags", "hidden", "nomap");
+COMMANDS.addAliases("flags", "clean", "finished");
+COMMANDS.addAliases("flags", "extend", "continue");
+
+COMMANDS.addAliases("tools", "explain", "help");
+COMMANDS.addAliases("tools", "arena", "new");
+COMMANDS.addAliases("tools", "resizearena", "expand");
+//--------------------------------------------------------------------MAIN
+function fetchCommand(_msg, _commandName) {
+	for (const typeName of ["flags", "tools", "core"]) {
+		const out = COMMANDS[typeName][_commandName];
+		if (out !== undefined) {return out;}
+	}
+	const holder = Holder.fetch(_msg.channel);
+	const out = ((holder && holder.arenaType && COMMANDS[holder.arenaType]) || {})[_commandName];
+	if (out !== undefined) {return out;}
+
+	throw `Command ${_commandName} not found`;
+}
+function fetchRequirements(_msg, _command) {
+	const out = [];
+	for (const req of Object.values(_command.requires || {})) {
+		out.push(fetchRequirement[req](_msg));}
 	return out;
 }
-//------------------------------------MODES
-function boolSwitch(_str, _default = "u") {
-	switch ((typeof(_str) === "string") ? _str[0].toLowerCase() : _default) {
-		case "t": return function(_current){return true;};
-		case "f": return function(_current){return false;};
-		case "u": return function(_current){return _current;};
-		case "!": return function(_current){return !_current;};
+function doCommand(_msg, _commandName, _args = []) {
+	const command = fetchCommand(_msg, _commandName.toLowerCase());
+	return command(...fetchRequirements(_msg, command), ..._args);
+}
+async function parseInstructionList(_msg, _flags = {}) {
+	_flags.force === undefined && (_flags.force = {});
+	_flags.suggest === undefined && (_flags.suggest = {});
 
-		default: return boolSwitch(_default);
-	}
-}
-function getDoResize(_str, _default = "c") {
-	let origin = (function(_strSplit){
-		if (_strSplit.length > 1) {
-			return [
-				(function(_x){
-					switch (_x[0]) {
-						case "l": return 0;
-						case "r": return 1;
-						default: return 0.5;
-					}
-				})(_strSplit[1]),
-				(function(_y){
-					switch (_y[0]) {
-						case "t": return 0;
-						case "b": return 1;
-						default: return 0.5;
-					}
-				})(_strSplit[0])
-			];
-		}
-		return [0.5, 0.5];
-	})(((typeof(_str) === "string" || _str instanceof String) ? _str.toLowerCase() : _default).split("-"));
-
-	return function(_token, _dim) {
-		_token.setPos([_token.x + origin[0]*(_token.h-_dim[0]), _token.y + origin[1]*(_token.v-_dim[1])]);
-		_token.setDim(_dim);
-	}
-}
-//------------------------------------PARSING
-class Coord {
-	static parse(_coord) {//l#{-#}/#-#{-#}
-		let out = [];
-		for (const str of _coord.split("-")) {
-			let charCode = str.charCodeAt(0);
-			(charCode > 64) ?
-			out.push(...[charCode - ((charCode > 96) ? 70 : 64), parseInt(str.slice(1), 10)])
-			: out.push(parseInt(str, 10));
-		}
-		return [out[1], out[0], (out.length > 2) ? out[2] : false];
-	}
-	static unparse(_coord) {//[x,y,z]
-		return [_coord[1], _coord[0]].concat((_coord[2] && _coord[2] !== 0) ? [_coord[2]] : []).join("-");
-	}
-
-	static parseLs(_coords) {
-		let out = [];
-		for (const coord of _coords) {
-			out.push(Coord.parse(coord));
-		}
-		return out;
-	}
-	static parseCSV(_coords) {
-		return Coord.parseLs(_coords.split(","));
-	}
-
-	static acceptToken(_arena, _command, _start, _need = 1) {
-		let out = [];
-		for (let i=_start; i<_command.length && out.length<_need; i++) {
-			let group = _arena.getGroup(Case.capital(_command[i]));
-			out.push((group !== undefined) ?
-			group.tokens[(group.tokens.length > 1) ? parseInt(_command[++i], 10) : 0].getCenter()
-			: Coord.parse(_command[i]));
-		}
-		return (_need > 1) ? out : out[0];
-	}
-}
-class Range {
-	static parse(_range) {
-		let corners = Coord.parseLs(_range.split(":"));
-		let out = [corners[0]];
-		if (corners.length < 2) {out.push(false);}
-		else {
-			out.push([]);
-			for (const i of [0, 1]) {out[1].push(corners[1][i] - corners[0][i] + 1);}
-		}
-		return out;
-	}
-	static unparse(_range) {
-		return [
-			Coord.unparse(_range[0]),
-			Coord.unparse([_range[0][0] + _range[1][0] - 1, _range[0][1] + _range[1][1] - 1]),
-		].join(":");
-	}
-
-	static parseLs(_ranges) {
-		let out = [];
-		for (let range of _ranges) {
-			out.push(Range.parse(range));
-		}
-		return out;
-	}
-	static parseCSV(_ranges) {
-		return Range.parseLs(_ranges.split(","));
-	}
-}
-
-class Colour {
-	static parseNum(_rgba) {
-		let rgba = ["#"];
-		for (const int in _rgba) {
-			let str = int.toString(16);
-			rgba.push((str.length > 1) ? str : "0" + str);
-		}
-		return rgba.join("");
-	}
-	static parseStr(_str) {
-		return (_str.startsWith("#")) ? _str : COLOURS.get(SHORTCUTS.get(_str[0].toLowerCase()));
-	}
-	static parse(_colour) {
-		return (_colour instanceof Array) ? Colour.parseNum(_colour) : Colour.parseStr(_colour);
-	}
-}
-class Case {
-	static capital(_str) {
-		return _str[0].toUpperCase() + _str.slice(1).toLowerCase();
-	}
-}
-//--------------------------------------------------------------------DECLUTTERING
-//------------------------------------WRAPPED
-function doRectGuide(_arena, _command) {//doGuide>RED (2).. [range => {origin, dim}]
-	let range = Range.parse(_command[2]);
-	_arena.setGuide(STYLES.guide.rect, {origin: range[0], dim: range[1]});
-}
-function doLineGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => origin] [token/coord => pos]
-	let coords = Coord.acceptToken(_arena, _command, 2, 2);
-	_arena.setGuide(STYLES.guide.line, {origin: coords[0], pos: coords[1]});
-}
-function doEllipseGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => origin] [int/coord => radii]
-	_arena.setGuide(STYLES.guide.ellipse, {
-		origin: Coord.acceptToken(_arena, _command, 2),
-		radii: (function(_str){
-			let out = parseInt(_str, 10);
-			return (isNaN(out)) ? Coord.parse(_str) : [out];
-		})(_command[_command.length - 1])
-	});
-}
-function doSundailGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => origin] (v => pos/radii)
-	let coords = Coord.acceptToken(_arena, _command, 2, 2);
-	_arena.setGuide(STYLES.guide.sundail, {
-		origin: coords[0],
-		pos: coords[1],
-		radii: [parseInt(_command[_command.length - 1], 10)]
-	});
-}
-function doConeGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => origin] [radii] [theta]
-	_arena.setGuide(STYLES.guide.cone, {
-		origin: Coord.acceptToken(_arena, _command, 2),
-		radii: (function(_str){
-			let out = parseInt(_str, 10);
-			return (isNaN(out)) ? Coord.parse(_str) : [out];
-		})(_command[_command.length - 2]),
-		theta: parseInt(_command[_command.length - 1], 10) * Math.PI/180
-	});
-}
-function doSpiderGuide(_arena, _command) {//doGuide>RED (2).. [token/coord => origin] [group/posCSV => posLs]
-	let posLs = function(_group){
-		if (_group === undefined) {return {};}
-		let out = [];
-		for (const token of _group.tokens) {
-			if (token.visible && !token.removed) {out.push([token.x, token.y, token.z]);}
-		}
-		return out;
-	}(_arena.getGroup(Case.capital(_command[_command.length-1])));
-	_arena.setGuide(STYLES.guide.spider, {
-		origin: Coord.acceptToken(_arena, _command, 2),
-		posLs: (posLs) ? posLs : Coord.parseCSV(_command[_command.length - 1])
-	})
-}
-
-function doNewGroup(_links, _command, _layer, _styles) {//(v) [colour] [name] {rangeCSV} {visible}
-	let arena = fetchArena(_links);
-	let name = Case.capital(_command[2]);
-	let rangeLs = (_command[3] === undefined) ? false : Range.parseCSV(_command[3]);
-	_styles.light = STYLES.general.none;
-	arena.newGroup(
-		_styles,
-		_layer,
-		name,
-		Colour.parse(_command[1]),
-		(rangeLs && rangeLs[0][1]) ? rangeLs[0][1] : [1,1]
-	);
-	if (rangeLs) {
-		arena.addToGroup(name, rangeLs, (_command[5] === undefined || _command[5][0].toLowerCase() !== "f"));
-		arena.shouldUpdate = true;
-		return {display: true};
-	}
-	return {};
-}
-
-function doFeedback(_links, _command, e) {
-	sendTemp(_links, `Operation cancelled due to error: ${_command[0]}`);
-}
-//------------------------------------ADMIN
-function doQuit(_links, _command, _force = false) {//quit {make instructions}
-	if (_force || _links.m.author.id === process.env.ADMINID) {
-		const instructionFunction = (_command[1] && _command[1][0].toLowerCase() === "f")
-		? function(){return;}
-		: function(_id, _holder){cache(_id, makeInstructions(_holder));}
-		for (const [id, holder] of allArenas) {
-			instructionFunction(id, holder);
-			cleanMap(holder);
-			cleanImg(holder);
-		}
-		setTimeout(function() {
-			bot.destroy();
-			process.exit();
-		}, 1500);
-	}
-	else {
-		sendTemp(_links, process.env.ADMINPROMPT)
-	}
-	return {over:{delete: true, display: false, clean: false}};
-}
-function doLog(_links, _command, _force = false) {//log [link code]/(->msg_to_log)log
-	if (_force || _links.m.author.id === process.env.ADMINID) {
-		let ref = fetchReference(_links.m);
-		if (ref) {
-			ref.then((msg) => {console.log(msg);});
-		}
-		else if (_command.length > 1) {
-			switch (_command[1][0].toLowerCase()) {
-				case "m": console.log(_links.m); break;
-				case "c": console.log(_links.c); break;
-				case "g": console.log(_links.g); break;
-				case "t": console.log(_links.t); break;
-			}
-		}
-	}
-	else {
-		sendTemp(_links, process.env.ADMINPROMPT)
-	}
-	return {display: false};
-}
-//------------------------------------USER
-//------------GENERAL
-function doPing(_links, _command) {//ping
-	sendTo(_links, `pong: ${Date.now()-_links.m.createdTimestamp} ms`);
-	return {};
-}
-
-const helpHelper = (function(_json){
-	let currentCategory;
-	for (const key in _json) {
-		if (_json.hasOwnProperty(key)) {
-			let el = _json[key];
-			el.aliases = [];
-			switch (el.type) {
-				case "category":
-					_json.categories.msg.push(Case.capital(key));
-					currentCategory = key;
-					break;
-				case currentCategory: _json[currentCategory].msg.push(Case.capital(key)); break;
-				case "alias":
-					el.aliases.push(el.msg);
-					for (const alias of _json[el.msg].aliases) {
-						el.aliases.push(alias);
-						_json[alias].aliases.push(key);
-					}
-					_json[el.msg].aliases.push(key);
-					el.msg = _json[el.msg].msg;
-					break;
-			}
-		}
-	}
-	for (const key in _json) {
-		if (_json.hasOwnProperty(key)) {
-			let el = _json[key];
-			let front = [`__**${Case.capital(key)}**__`];
-			if (el.aliases && el.aliases.length > 0) {front.push(`__Aliases__: ${el.aliases.join(", ")}`);}
-			el.msg = front.concat(el.msg).join("\n");
-		}
-	}
-	return _json;
-})(JSON.parse(fs.readFileSync("./help.json")));
-function doHelp(_links, _command) {//help ()/[command]
-	sendTemp(_links, helpHelper[(_command.length > 1) ? _command[1].toLowerCase() : "categories"].msg);
-	return {display:false};
-}
-async function doImage(_links, _command) {//image ()/(->msg_with_thread)--image
-	let holder = ensureHolder(_links);
-	if (!holder.img) {
-		if (_links.t) {
-			holder.img = _links.t;
-		}
-		else if (_command.length > 1) {
-			holder.img = await fetchChannel(_command[1]);
-		}
-		else if (_links.m.reference !== null) {
-			let anchor = await fetchReference(_links.m);
-			if (!anchor.hasThread) {return {};}
-			holder.img = await fetchChannel(anchor.id);
-		}
-		else {
-			holder.img = await sendTo(_links, process.env.IMGPROMPT).then((_anchor) => {
-				return _anchor.startThread({name: process.env.IMGNAME, autoArchiveDuration: 60});
-			});
-		}
-	}
-	else if (_links.t && _links.t.id === holder.img.id) {
-		cleanImg(holder);
-	}
-	else {
-		holder.img.setArchived(false);
-		makeTemp(fetchMessage(_links.c.id, holder.img.id).then((_anchor) => {_anchor.reply("bump");}));
-	}
-	if (holder.img) {sendTemp({c:holder.img}, process.env.IMGNOTIFY);}
-	if (holder.arena) {holder.arena.shouldUpdate = true;}
-	return {display: true};
-}
-//------------ARENA
-const guideHelper = MultiMap.newMap([
-	[["rect", "box", "square"], doRectGuide],
-	[["line", "straight"], doLineGuide],
-	[["ellipse", "circle"], doEllipseGuide],
-	[["sundail", "equidistant"], doSundailGuide],
-	[["cone", "triangle"], doConeGuide],
-	[["spider", "multiline"], doSpiderGuide]
-]);
-function doGuide(_links, _command) {//guide ()/[shapeStr] {shapeArgs}
-	let arena = fetchArena(_links);
-	if (_command.length > 1) {
-		guideHelper.get(_command[1].toLowerCase())(arena, _command);
-		arena.shouldUpdate = true;
-	}
-	arena.displayGuide();
-	return {display: true};
-}
-function doList(_links, _command) {//list
-	let msgMap = new Map();
-	for (const [key, teamName] of SHORTCUTS) {
-		msgMap.set(COLOURS.get(teamName), [`__Team: ${teamName} (${COLOURS.get(teamName)})__`]);
-	}
-	for (const [name, group] of fetchArena(_links).groups) {
-		if (msgMap.get(group.colour) === undefined) {
-			msgMap.set(group.colour, [`__Team: ${group.colour} (No affiliation)__`]);
-		}
-		msgMap.get(group.colour).push(`Token: ${group.code} => Name: ${name}`);
-	}
-	let msg = [];
-	if (_command.length == 1) {
-		for (const [team, ls] of msgMap) {
-			if (ls.length > 1) {msg.push(ls.join("\n"));}
-		}
-	}
-	else {msg.push(msgMap.get(Colour.parse(_command[1])).join("\n"));}
-	sendTemp(_links, msg.join("\n\n"));
-	return {};
-}
-function doDistance(_links, _command) {//distance ([coord]/[name] {i}) ([coord]/[name] {i})
-	let arena = fetchArena(_links);
-	let coords = Coord.acceptToken(arena, _command, 1, 2);
-	let out = 0;
-	for (let j = 0; j<3; j++) {
-		out += (((coords[1][j]) ? coords[1][j] : 0) - ((coords[0][j]) ? coords[0][j] : 0))**2;
-	}
-	sendTemp(_links, Math.sqrt(out).toString());
-	return {};
-}
-function doInstructions(_links, _command) {//instructions
-	sendTo(_links, makeInstructions(fetchHolder(_links)));
-	return {over: {timer: false}};
-}
-function doEditAmbientLight(_links, _command) {//ambient [a] / [r] [g] [b] {a} / rgb{a}CSV
-	let layer = fetchArena(_links, true).layers.light;
-	let rgba = [];
-	for (const cmd of _command.slice(1)) {
-		rgba.push(...(function(_cmdSplit){
-			let out = [];
-			for (const val of _cmdSplit) {out.push(parseFloat(val, 10).toFixed(2));}
-			return out;
-		})(cmd.split(",")));
-	}
-	switch (rgba.length) {
-		case 1: layer.ambientOpacity = rgba[0]; break;
-		case 3: layer.makeShadow = LightLayer.makeShadowMaker(rgba); break;
-		case 4:
-			layer.makeShadow = LightLayer.makeShadowMaker(rgba.slice(0, 3));
-			layer.ambientOpacity = rgba[4];
-			break;
-
-		default: throw `doEditAmbientLight cannot take ${rgba.length} arguments.`
-	}
-	return {display: true};
-}
-
-function doNewArena(_links, _command) {//new [coord: bottom-right]
-	ensureHolder(_links).arena = new Arena(Coord.parse(_command[1]).slice(0,2), sendTemp, _links);
-	return {over: {display: true}};
-}
-//------------GROUP
-function doMoveGroup(_links, _command) {//movegroup [name] [rangeCSV] {visible}
-	const tokens = requireGroup(_links, _command[1], true).tokens;
-	let mode = (_command[3] === undefined) ? false : boolSwitch(_command[3], "u");
-
-	let tokenInd = 0;
-	for (const range of Range.parseCSV(_command[2])) {
-		if (tokenInd >= tokens.length) {return {};}
-		while (tokens[tokenInd].removed) {
-			if (++tokenInd >= tokens.length) {return {};}
-		}
-		(function(_token){
-			_token.setPos(range[0]);
-			if (range[1]) {_token.setDim(range[1]);}
-			if (mode) {_token.visible = mode(_token.visible);}
-		})(tokens[tokenInd++]);
-		out = true;
-	}
-	return {display: true};
-}
-function doHideGroup(_links, _command) {//hidegroup [name] {mode}
-	let mode = boolSwitch(_command[2], "!");
-	for (const token of requireGroup(_links, _command[1], true).tokens) {token.visible = mode(token.visible);}
-	return {display: true};
-}
-function doRemoveGroup(_links, _command) {//removegroup [name]
-	let arena = fetchArena(_links);
-	const out = (function(_group){
-		return (_group && _group.tokens.length > 0);
-	})(arena.getGroup(Case.capital(_command[1])));
-	arena.removeGroup(Case.capital(_command[1]));
-	return {display: out};
-}
-function doResizeGroup(_links, _command) {//resizegroup [name] [dims] {origin}
-	let group = requireGroup(_links, _command[1], true);
-	group.dim = (function(_range){
-		return (_range[1]) ? _range[1] : _range[0].slice(0,2);
-	})(Range.parse(_command[2]));
-
-	if (_command[3] && _command[3][0].toLowerCase() !== "f") {
-		let doResize = getDoResize(_command[3]);
-		for (const token of group.tokens) {doResize(token, group.dim);}
-		return {display: true};
-	}
-	return {};
-}
-function doEditGroupLight(_links, _command) {//makelight [name] ()/([radius] [opacity] {startFade})
-	let group = requireGroup(_links, _command[1], true);
-	if (_command.length > 3) {
-		group.radius = parseFloat(_command[2], 10);
-		group.opacity = parseFloat(_command[3], 10);
-		if (_command[4] !== undefined) {group.startFade = parseFloat(_command[4], 10);}
-	}
-	group.style.light = (function(_r, _o, _current){
-		return (
-			!(_r === undefined || isNaN(_r) || _o === undefined || isNaN(_o)) &&
-			(_current.id === STYLES.general.none.id || _command.length > 3)
-		);
-	})(group.radius, group.opacity, group.style.light) ? STYLES.light.gradient : STYLES.general.none;
-	return {display: (group.tokens.length > 0)};
-}
-
-function doNewStaticGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, 1, {
-		token: STYLES.token.grid,
-		cell: STYLES.cell.rect,
-		name: STYLES.general.none
-	});
-}
-function doNewObjectGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, 2, {
-		token: STYLES.token.image,
-		cell: STYLES.cell.rect,
-		name: STYLES.general.none
-	});
-}
-function doNewAreaGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, 4, {
-		token: STYLES.token.grid,
-		cell: STYLES.cell.rect,
-		name: STYLES.name.middle
-	});
-}
-function doNewConcentricGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, 4, {
-		token: STYLES.token.layer,
-		cell: STYLES.cell.ellipse,
-		name: STYLES.name.middle
-	});
-}
-function doNewSwarmGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, 3, {
-		token: STYLES.token.grid,
-		cell: STYLES.cell.ellipse,
-		name: STYLES.name.corner
-	});
-}
-function doNewCreatureGroup(_links, _command) {//RED> doNewGroup
-	return doNewGroup(_links, _command, -1, {
-		token: STYLES.token.image,
-		cell: STYLES.cell.ellipse,
-		name: STYLES.name.partial
-	});
-}
-function doNewLightGroup(_links, _command) {//(RED> doEditGroupLight).concat({rangeCSV});
-	doNewGroup(_links, ["", "o", _command[1], (_command.length > 4) ? _command[_command.length-1] : undefined], 0, {
-			token: STYLES.general.none,
-			cell: STYLES.cell.rect,
-			name: STYLES.general.none
-		}
-	);
-	return doEditGroupLight(_links, _command);
-}
-function doNewCustomGroup(_links, _command) {//custom [layer] [token] [cell] [name] {light} RED> doNewGroup
-	let token = (function(_token){
-		switch(_token[0].toLowerCase()) {
-			case "f": return STYLES.token.fill;
-			case "g": return STYLES.token.grid;
-			case "l": return STYLES.token.layer;
-			case "i": return STYLES.token.image;
-			case "n": return STYLES.general.none;
-
-			default: throw `Invalid token style for custom group: ${_token}`;
-		}
-	})(_command[2]);
-	let cell = (function(_cell){
-		switch(_cell[0].toLowerCase()) {
-			case "r": return STYLES.cell.rect;
-			case "e": return STYLES.cell.ellipse;
-			case "c": return STYLES.cell.clear;
-			case "n": return STYLES.general.none;
-
-			default: throw `Invalid cell style for custom group: ${_token}`;
-		}
-	})(_command[3]);
-	let name = (function(_name){
-		switch(_name[0].toLowerCase()) {
-			case "m": return STYLES.name.middle;
-			case "c": return STYLES.name.corner;
-			case "p": return STYLES.name.partial;
-			case "n": return STYLES.general.none;
-
-			default: return STYLES.general.none;
-		}
-	})(_command[4]);
-
-	return doNewGroup(_links, _command.slice(4), parseInt(_command[1], 10), {
-		token: token,
-		cell: cell,
-		name: name
-	});
-}
-//------------TOKEN
-function doMoveToken(_links, _command) {//move [name] {iCSV} [rangeCSV] {visible}
-	let group = requireGroup(_links, _command[1], true);
-	let [ranges, mode] = (function(_cmd){
-		let out = Range.parseCSV(_cmd);
-		if (out[0][0][0] === undefined) {return [false, boolSwitch(_cmd, "u")];}
-		return [out, false];
-	})(_command[_command.length - 1]);
-	if (!ranges) {ranges = Range.parseCSV(_command[_command.length - 2]);}
-
-	for (const [i, token] of fetchTokens(group, _command[2]).entries()) {
-		let range = ranges[i];
-		token.setPos(range[0]);
-		if (range[1]) {token.setDim(range[1]);}
-		if (mode) {token.visible = mode(token.visible);}
-	}
-	return {display: true};
-}
-function doHideToken(_links, _command) {//hide [name] {iCSV} {mode}
-	let group = requireGroup(_links, _command[1], true);
-	let mode = boolSwitch(_command[_command.length - 1], "!");
-	for (const token of fetchTokens(group, _command[2])) {token.visible = mode(token.visible);}
-	return {display: true};
-}
-function doRemoveToken(_links, _command) {//remove [name] {iCSV} {mode} {andGroup}
-	let group = requireGroup(_links, _command[1], true);
-	let mode = boolSwitch(_command[_command.length - 1], "t");
-	for (const token of fetchTokens(group, _command[2])) {token.removed = mode(token.removed);}
-
-	if (_command[4] && _command[4][0].toLowerCase() === "t" && group.isEmpty()) {doRemoveGroup(_command[1]);}
-	return {display: true};
-}
-
-function doNewToken(_links, _command) {//copy [name] [rangeCSV] {visible}
-	fetchArena(_links, true).addToGroup(
-		Case.capital(_command[1]),
-		Range.parseCSV(_command[2]),
-		(_command[3] === undefined || _command[3][0].toLowerCase() !== "f")
-	);
-	return {display: true};
-}
-//--------------------------------------------------------------------MAIN
-const commandHelper = MultiMap.newMap([
-	[["quit"], doQuit],
-	[["log"], doLog],
-	[["ping"], doPing],
-	[["help", "explain"], doHelp],
-	[["image", "thread"], doImage],
-	[["new", "arena"], doNewArena],
-	[["guide", "preview"], doGuide],
-	[["list", "tokens"], doList],
-	[["distance", "separation"], doDistance],
-	[["instructions", "collapse"], doInstructions],
-	[["static"], doNewStaticGroup],
-	[["object"], doNewObjectGroup],
-	[["swarm"], doNewSwarmGroup],
-	[["grid", "area"], doNewAreaGroup],
-	[["circular", "concentric"], doNewConcentricGroup],
-	[["creature"], doNewCreatureGroup],
-	[["light", "dark"], doNewLightGroup],
-	[["custom", "tailor"], doNewCustomGroup],
-	[["movegroup"], doMoveGroup],
-	[["hidegroup", "revealgroup"], doHideGroup],
-	[["removegroup"], doRemoveGroup],
-	[["resizegroup"], doResizeGroup],
-	[["copy", "newtoken"], doNewToken],
-	[["move"], doMoveToken],
-	[["hide", "reveal"], doHideToken],
-	[["remove"], doRemoveToken],
-	[["editlight", "editdark"], doEditGroupLight],
-	[["ambient"], doEditAmbientLight],
-	[["keep"], function(_l, _c){return {over: {delete: false}};}],
-	[["map", "display"], function(_l, _c){return {over: {display: true}};}],
-	[["nomap", "hidden"], function(_l, _c){return {over: {display: false}};}],
-	[["clean", "finished"], function(_l, _c){return {over: {timer: 500}};}]
-]);
-async function mainSwitch(_links, _command, _flags) {
-	if (_command[0].startsWith(PREFIX)) {
-		_command[0] = _command[0].slice(PREFIX.length).toLowerCase()
-		console.log(_command);
-		try {
-			for (const [key, val] of Object.entries(await commandHelper.get(_command[0])(_links, _command))) {
-				if (_flags[key] === undefined) {_flags[key] = val;}
-				else if (key === "over") {
-					for (const [keyOver, valOver] of Object.entries(val)) {
-						_flags[keyOver] = valOver;
+	for (const messageLine of _msg.content.split("\n")) {
+		if (_flags.error) {break;}
+		else if (messageLine.startsWith(PREFIX)) {
+			const command = messageLine.slice(PREFIX.length).split(" ");
+			console.log(command);
+			try {
+				for (const [key, val] of Object.entries(await doCommand(_msg, command[0], command.slice(1)) || {})) {
+					if (_flags[key] === undefined) {_flags[key] = val;}
+					else if (key === "force" || (key === "suggest" && !_flags.didCommand)) {
+						for (const [subKey, subVal] of Object.entries(val)) {_flags[subKey] = subVal;}
 					}
 				}
-			}
-		} catch (e) { doFeedback(_links, _command, e); }
-		if (_flags.delete === undefined) {_flags.delete = true;}
-		if (_flags.timer === undefined) {_flags.timer = ONE_HOUR;}
-	}
-}
-
-async function parseContent(_links, _content, _flags = {}) {
-	_flags.over = {};
-	for (const messageLine of _content.split("\n")) {
-		await mainSwitch(_links, messageLine.split(" "), _flags);
-	}
-	const holder = fetchHolder(_links);
-	let flagChange = false;
-	if (holder && holder.arena) {
-		if (_flags.timer) {
-			clearTimeout(holder.timeout);
-			holder.timeout = cleanTimeout(_links, _flags.timer);
+			} catch (e) {_flags.error = true; console.error(e);}
+			_flags.didCommand = true;
 		}
-		if (_flags.display) {
-			let imgUrls = false;
-			if (holder.img) {
-				imgUrls = new Map();
-				for (const [key, msg] of await holder.img.messages.fetch({limit:100})) {
-					if (msg.attachments.size > 0) {
-						out.set(Case.capital(msg.content), msg.attachments.entries().next().value[1].url);
+	}
+	return _flags;
+}
+async function parseMessage(_msg) {
+	console.log(`#${_msg.author.discriminator} @${_msg.channel.id}`);
+
+	let [msg, flags] = await (async function(_line0) {
+		if (_line0.startsWith(PREFIX)) {
+			const macro = _line0.slice(PREFIX.length).split(" ");
+			switch (macro[0]) {
+				case "parse":
+					const ref = await bot.fetchReference(_msg);
+					if (ref) {
+						DiscordCleaner.delete(_msg);
+						return [ref, {delete: ref.author.id === bot.user.id}];
 					}
-				}
-			}
+					return;
+				case "log":
+					doLog(_msg, macro[1]);
+					break;
+				case "quit":
+					_msg.author.id === process.env.ADMIN_ID && doQuit();
+					break;
+				case "clearmessages":
+					_msg.author.id === process.env.ADMIN_ID && doClearMessages(_msg, parseInt(macro[1]) || undefined);
+					break;
+				case "test":
+					_msg.author.id === process.env.ADMIN_ID && doTest(_msg, ...macro.slice(1));
+					break;
 
-			flagChange = holder.arena.buildMap(await imgUrls)
-			.then((_map) => {
-				cleanMap(holder);
-				sendTo(_links, {files: [new MessageAttachment(_map, _links.c.id + "_map.png")]}).then((_msg) => {
-					holder.map = _msg;
-				});
-				return false;
-			})
-			.catch((_err) => {
-				sendTemp(_links, "Error rebuilding map. Common issues:\n - Incorrectly entered coordinates for --new");
-				return _flags.delete = false;
-			});
+				default: return;
+			}
+			DiscordCleaner.delete(_msg);
+			return [false, false];
 		}
+		return;
+	})(_msg.content.split("\n")[0].toLowerCase()) || [_msg, {}];
+
+	msg && (flags = await parseInstructionList(msg, flags));
+
+	if (flags.error) {
+		minorUtils.makeTemp(msg.channel.send("Some Error Message"));
 	}
-	await flagChange;
-	if (_flags.delete) {_links.m.delete().catch((error) => {});}
+	else if (flags.didCommand) {
+		const holder = Holder.fetch(msg.channel);
+		if (holder) {
+			flags.timer !== false && Holder.setCleanTimer(holder, flags.timer);
+			if (holder.arena) {
+				flags.update && holder.arena.updateAllLayers();
+				try {
+					flags.display !== false && await holder.sendMap();
+				} catch (e) {flags.error = true; console.error(`Problem displaying map in channel @${_msg.channel.id}`);}
+			}
+		}
+
+		flags.delete === false || flags.error || DiscordCleaner.delete(msg);
+	}
 }
 
-bot.once("ready", async () => {
+bot.on("ready", () => {
+	if (!CONSOLES.arena) { throw "No arenas have been registered"; }
+
 	console.log(`Logged in as ${bot.user.tag}`);
-	bot.user.setActivity("Ask me to --explain :D");
+	bot.user.setActivity(`for ${PREFIX}explain`, {type: "WATCHING"});
 
-	const cache = "./cache/";
-	fs.readdir(cache, (e_dir, files) => {
-		if (e_dir) { throw e_dir; }
+	fs.readdir(instructionDir, (dir_e, files) => {
+		if (dir_e) { throw dir_e; }
 
 		for (const fileName of files) {
-			fs.readFile(cache + fileName, async (e_read, data) => {
-				if (e_read) { throw e_read; }
+			const filePath = instructionDir + fileName;
+			fs.readFile(filePath, (read_e, data) => {
+				if (read_e) { throw read_e; }
 
-				await parseContent({c: fetchChannel(fileName.split(".")[0])}, data.toString(), {delete: false});
-				fs.rm(cache + fileName, (e_rm) => {
-					if (e_rm) { throw e_rm; }
+				bot.fetchCachedChannel(fileName.split(".")[0]).send(data.toString()).then((_msg) => {
+					parseMessage(_msg, {delete: true});
+				});
+				fs.rm(filePath, (rm_e) => {
+					if (rm_e) { throw rm_e; }
 				});
 			});
 		}
 	});
 });
-
-bot.on("messageCreate", async (_message) => {
-	if (!_message.author.bot) {
-		console.log(`#${_message.author.discriminator} @${_message.channel.id}`);
-
-		let flags = {};
-		const links = buildLinks(await (function(){
-			if (_message.reference !== null && _message.content.toLowerCase() === `${PREFIX}parse`) {
-				let msg = fetchReference(_message);
-				msg.then((_msg) => { flags.delete = (_msg.author.id === bot.user.id); });
-				_message.delete();
-				return msg;
-			}
-			return _message;
-		})());
-		parseContent(links, links.m.content, flags);
-	}
+bot.on("messageCreate", (_msg) => {
+	!_msg.author.bot && parseMessage(_msg);
+});
+bot.on("guildDelete", (_guild) => {
+	_guild.channels.fetch().then((_channels) => {
+		for (const [id, textChannel] of _channels.filter((c) => c.type === "GUILD_TEXT").entries()) {
+			const holder = Holder.get(id);
+			holder && Holder.clean(holder);
+		}
+	}).catch(err => console.error(err));
 });
 //--------------------------------------------------------------------FINALIZE
-bot.login(process.env.TOKEN);
+bot.login(process.env.DEV_TOKEN);
 
 process.on("SIGINT", () => {
-	doQuit({}, ["", "true"], true);
+	doQuit();
 });
+
+module.exports = {};

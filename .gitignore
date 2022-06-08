@@ -1,6 +1,7 @@
-assets/placeholder/
-node_modules/
-cache/
 ssh/
+npm*
+node*
+a_*
 .env
 package-lock.json
+cache/*

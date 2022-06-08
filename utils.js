@@ -1,110 +1,64 @@
-//--------------------------------------------------------------------RECT
-class Rect {
-	constructor(_x, _y, _h, _v) {
-		this.x = 0;
-		this.y = 0;
-		this.h = 0;
-		this.v = 0;
-		this.setAbs(_x, _y, _h, _v);
+const {DiscordCleaner} = require("cmdaisy-utils").discord;
+//--------------------------------------------------------------------MAIN
+//------------------------------------PARSER
+class Parser {
+	static makeTokenTup(_tupStr) {
+		const [name, iCSV] = _tupStr.split(":");
+		let iAry;
+		if (iCSV) {
+			iAry = [];
+			for (const iStr of iCSV.split(",")) {iAry.push(parseInt(iStr, 10));}
+		}
+		return [name.toLowerCase(), iAry];
 	}
 
-	setAbs(_x, _y, _h, _v) {
-		if (_x || _x === 0) {this.x = _x;}
-		if (_y || _y === 0) {this.y = _y;}
-		if (_h && _h >= 0) {this.h = _h;}
-		if (_v && _v >= 0) {this.v = _v;}
-		return this;
-	}
-	alterAbs(_dx, _dy, _dh, _dv) {
-		let x = (_dx) ? this.x + _dx : false;
-		let y = (_dy) ? this.y + _dy : false;
-		let h = (_dh) ? this.h + _dh : false;
-		let v = (_dv) ? this.v + _dv : false;
-		return this.setAbs(x, y, h, v);
+	init() {}
+	constructor(_extraEntries) {
+		for (const [key, val] of Object.entries(_extraEntries)) {this[key] = val;}
+		this.init();
 	}
 
-	setPos(_x, _y) {
-		return this.setAbs(_x, _y, false, false);
+	fromCSV(_typeCSV) {
+		const out = [];
+		for (const typeStr of _typeCSV.split(",")) {out.push(this.fromStr(typeStr));}
+		return out;
 	}
-	setDim(_h, _v) {
-		return this.setAbs(false, false, _h, _v);
+	fromTokenTupStr(_arena, _tokenTupStr) {
+		return this.fromToken(_arena.fetchTokens(...Parser.makeTokenTup(_tokenTupStr))[0]);
 	}
-	alterPos(_dx, _dy) {
-		return this.alterAbs(_dx, _dy, false, false);
-	}
-	alterDim(_dh, _dv) {
-		return this.alterAbs(false, false, _dh, _dv);
-	}
-
-	set(_x, _y, _h, _v) {
-		return this.setPos(_x, _y).setDim(_h, _v);
-	}
-	alter(_dx, _dy, _dh, _dv) {
-		return this.alterPos(_dx, _dy).alterDim(_dh, _dv);
-	}
-
-	setFrom(_that) {
-		return this.set(_that.x, _that.y, _that.h, _that.v);
-	}
-	alterBy(_that) {
-		return this.alter(_that.x, _that.y, _that.h, _that.v);
-	}
-
-	centerStretch(_h, _v) {
-		return this.setAbs(this.x + (this.h-_h)/2, this.y + (this.v-_v)/2, _h, _v);
+	fromUnknown(_arena, _typeStrOrTokenTupStr) {
+		const fromStr = this.fromStr(_typeStrOrTokenTupStr);
+		return (this.verify(fromStr)) ? fromStr : this.fromTokenTupStr(_arena, _typeStrOrTokenTupStr);
 	}
 }
-//--------------------------------------------------------------------TREEMAP
-class TreeMap extends Map {
-	constructor(_leaves, _branch, _entries) {
-		super();
-		this.branch = (_branch === undefined || _branch < 0) ? 0 : _branch;
-		this.leaves = (_leaves === undefined || _leaves < this.branch) ? this.branch : _leaves;
-		if (_entries !== undefined) {
-			for (const [key, val] of _entries) {
-				this.set(key, val);
+//------------------------------------BOOL_MODES
+const BoolMode = {
+	TRUE() {return true;},
+	FALSE() {return false;},
+	FLIP(_bool) {return !_bool;},
+
+	SWITCH(_mode, _default = "u") {
+		if (_mode) {
+			switch (_mode[0].toLowerCase()) {
+				case "u": return false;
+				case "t": return this.TRUE;
+				case "f": return this.FALSE;
+				case "!": return this.FLIP;
 			}
 		}
-	}
-
-	isLeaves() {
-		return !(this.branch < this.leaves);
-	}
-	nextBrach(_key, _onlyGet = false) {
-		let key = _key[this.branch];
-		if (super.get(key) === undefined) {
-			if (_onlyGet) {return undefined;}
-			super.set(key, (this.isLeaves()) ? new Map() : new TreeMap(this.leaves, this.branch + 1));
-		}
-		return super.get(key);
-	}
-
-	get(_key) {
-		let branch = this.nextBranch(_key, true);
-		return (branch) ? branch.get(_key) : branch;
-	}
-	set(_key, _val) {
-		return this.nextBranch(_key).set(_key, val);
+		return this.SWITCH(_default);
 	}
 }
-//--------------------------------------------------------------------MULTIMAP
-class MultiMap {
-	static doMulti(_map, _entries) {
-		for (const [keyLs, val] of _entries) {
-			for (const key of keyLs) {_map.set(key, val);}
-		}
-		return _map;
-	}
-	static newMap(_entries) {
-		return MultiMap.doMulti(new Map(), _entries);
-	}
-	static newTree(_leaves, _entries) {
-		return MultiMap.doMulti(new TreeMap(_leaves), _entries);
+//--------------------------------------------------------------------HELPERS
+const minorUtils = {
+	STANDARD_DURATION: 1000*5,
+	async makeTemp(_obj, _r = 1) {
+		DiscordCleaner.deleteAfter(await _obj, _r*this.STANDARD_DURATION);
 	}
 }
 //--------------------------------------------------------------------FINALIZE
 module.exports = {
-	Rect,
-	MultiMap,
-	TreeMap
-}
+	Parser,
+	BoolMode,
+	minorUtils
+};
