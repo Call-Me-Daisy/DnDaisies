@@ -383,7 +383,7 @@ bot.on("guildDelete", (_guild) => {
 	}).catch(err => console.error(err));
 });
 //--------------------------------------------------------------------FINALIZE
-bot.login(process.env.DEV_TOKEN);
+bot.login(process.env.USE_TOKEN);
 
 process.on("SIGINT", () => {
 	doQuit();
