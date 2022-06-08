@@ -361,9 +361,11 @@ bot.on("ready", () => {
 			fs.readFile(filePath, (read_e, data) => {
 				if (read_e) { throw read_e; }
 
-				bot.fetchCachedChannel(fileName.split(".")[0]).send(data.toString()).then((_msg) => {
-					parseMessage(_msg, {delete: true});
-				});
+				try {
+					bot.fetchCachedChannel(fileName.split(".")[0]).send(data.toString()).then((_msg) => {
+						parseMessage(_msg, {delete: true});
+					});
+				} catch (e) {console.error(`Could not find channel ${fileName.split(".")[0]}`);}
 				fs.rm(filePath, (rm_e) => {
 					if (rm_e) { throw rm_e; }
 				});
