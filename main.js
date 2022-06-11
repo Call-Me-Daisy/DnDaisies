@@ -6,7 +6,8 @@ const {Intents, MessageAttachment, TextChannel, ThreadChannel} = require("discor
 const [{sliceArgs}, {DiscordBot, DiscordCleaner}] = require("cmdaisy-utils").unpack("general", "discord");
 
 const {minorUtils} = require("./utils");
-const {COMMANDS, CONSOLES} = require("./extender");
+const REG = require("./extender");
+const {COMMANDS, CONSOLES} = REG;
 //--------------------------------------------------------------------CONSTANTS
 const PREFIX = "--";
 const instructionDir = "./cache/";
@@ -147,7 +148,7 @@ const fetchRequirement = {
 };
 //--------------------------------------------------------------------COMMANDS
 //------------------------------------FLAGS
-COMMANDS.registerType("flags");
+COMMANDS.registerCategory("flags");
 COMMANDS.register("flags", "delete", function() {return {force: {delete: true}}});
 COMMANDS.register("flags", "keep", function() {return {force: {delete: false}}});
 
@@ -158,7 +159,13 @@ COMMANDS.register("flags", "clean", function() {return {force: {timer: 1000}, su
 COMMANDS.register("flags", "extend", function() {return {force: {timer: Holder.defaultTimer}, suggest: {display: false}}});
 //------------------------------------TOOLS
 COMMANDS.register("tools", "explain", function(_msg, _key) {
-
+	let toExplain = REG;
+	if (_key) {
+		for (const keyPart of _key.split(".")) {toExplain = toExplain[keyPart];}
+	}
+	toExplain.explainText &&	minorUtils.makeTemp(_msg.channel.send(toExplain.explainText));
+	console.log(toExplain)
+	return {display: false};
 }).requires = ["message"];
 
 COMMANDS.register("tools", "arena", function(_msg, _arenaType) {
@@ -385,7 +392,7 @@ bot.on("guildDelete", (_guild) => {
 	}).catch(err => console.error(err));
 });
 //--------------------------------------------------------------------FINALIZE
-bot.login(process.env.USE_TOKEN);
+bot.login(process.env.DEV_TOKEN);
 
 process.on("SIGINT", () => {
 	doQuit();

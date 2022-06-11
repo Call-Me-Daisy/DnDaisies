@@ -74,14 +74,14 @@ class dnd_Arena extends Arena {
 	}
 
 	makeCommandList(_w, _h, _dx = 0, _dy = 0) {
-		const cmd = [];
-		cmd.push(`arena dnd ${_w || this.w} ${_h || this.h}`);
-		cmd.push(`ambient ${this.layers.light.getShadowHue().join(",")} ${this.layers.light.ambientOpacity}`);
+		const commands = [];
+		commands.push(`arena dnd ${_w || this.w} ${_h || this.h}`);
+		commands.push(`ambient ${this.layers.light.getShadowHue().join(",")} ${this.layers.light.ambientOpacity}`);
 		for (const [name, group] of this.groups) {
 			if (!group.drawStage) {continue;}
 			const styles = [];
 			for (const [layerName, groupStyle] of Object.entries(group.styles)) {
-				styles.push(`${layerName}:${groupStyle.type}.${groupStyle.handle}`);
+				styles.push(`${layerName}:${groupStyle.category}.${groupStyle.handle}`);
 			}
 
 			const ranges = [];
@@ -94,15 +94,15 @@ class dnd_Arena extends Arena {
 			}
 
 			if (ranges.length > removed.length) {
-				cmd.push(`custom ${name} ${group.colour} ${group.drawStage} ${styles.join(",")} ${ranges.join(",")}`);
-				(hidden.length > 0) && cmd.push(`hide ${name}:${hidden.join(",")} t`);
-				(removed.length > 0) && cmd.push(`remove ${name}:${removed.join(",")} t`);
-				group.styles.light && group.radius && group.opacity !== undefined && cmd.push(
+				commands.push(`custom ${name} ${group.colour} ${group.drawStage} ${styles.join(",")} ${ranges.join(",")}`);
+				(hidden.length > 0) && commands.push(`hide ${name}:${hidden.join(",")} t`);
+				(removed.length > 0) && commands.push(`remove ${name}:${removed.join(",")} t`);
+				group.styles.light && group.radius && group.opacity !== undefined && commands.push(
 					`editlight ${name} ${group.radius} ${group.opacity}` + ((group.startFade) ? ` ${group.startFade}` : "")
 				);
 			}
 		}
-		return cmd;
+		return commands;
 	}
 	async buildMap(_imgThread) {
 		let imgUrls = false;

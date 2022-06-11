@@ -2,11 +2,41 @@ const fs = require("fs");
 
 const {Registry} = require("cmdaisy-utils").general;
 //--------------------------------------------------------------------CONSTANTS
-const REGISTRIES = {
-	COMMANDS: new Registry(), //Directly called by user
-	CONSOLES: new Registry(), //Sub-commands that are called by functions in COMMANDS
-	STYLES: new Registry() //Functions dictating how groups are drawn to the map
-};
+class ExplainCategory extends Registry.Category {
+	static missingExplainText = "No explanation available";
+	static build() {return new ExplainCategory(...arguments);}
+	constructor(_categoryName, _explainText = ExplainCategory.missingExplainText, _extension = "") {
+		super(_categoryName, _extension + "Explain");
+		this.explainText = _explainText;
+	}
+
+	register(_elementName, _element, _explainText = ExplainCategory.missingExplainText) {
+		_element.explainText = _explainText;
+		return super.register(_elementName, _element);
+	}
+}
+class ExplainRegistry extends Registry {
+	static build() {return new ExplainRegistry(...arguments);}
+	constructor(_handle, _explainText = ExplainCategory.missingExplainText, _makeCategory = ExplainCategory.build, _extension = "") {
+		super(_handle, _makeCategory, _extension + "Explain");
+		this.explainText = _explainText;
+	}
+}
+
+const REGISTRIES = new ExplainRegistry(
+	"REG",
+	"__Categories__\nFor more detail about a subject call 'explain [CATEGORY].{subcategory}.{handle}' (case-sensitive), ie.\n> explain COMMANDS\n> explain CONSOLES.newGroup.dnd",
+	ExplainRegistry.build
+);
+REGISTRIES.registerCategory("COMMANDS",
+	"Functions called directly by the user; can take any number of (space-separated) arguments"
+);
+REGISTRIES.registerCategory("CONSOLES",
+	"Subcommands called by certain wrapper COMMANDS (ie. arena or guide)"
+);
+REGISTRIES.registerCategory("STYLES",
+	"Functions that actually create the map image from the arena"
+);
 //--------------------------------------------------------------------MAIN
 const dir = "./extensions/";
 
