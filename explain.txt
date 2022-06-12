@@ -2,8 +2,9 @@ CONCEPTS
 	colourShortcuts: "Common teams (ally/enemy/party/etc) or types (fire/ice/ground/wall/etc) that have an assigned colour.\nCan be used instead of hex-code to specify a colour - either as the whole word, or just the first letter."
 
 	REG: "__Categories__\nFor more detail about a subject call 'explain [CATEGORY].{subcategory}.{handle}' (case-sensitive), ie.\n> explain COMMANDS\n> explain CONSOLES.newGroup.dnd"
-#
+##
 REG
+	KEYWORDS: "Shorthand names that will be used throughout the help text for this bot"
 	COMMANDS: "Functions called directly by the user\nCan take any number of (space-separated) arguments"
 	CONSOLES: "Subcommands called by certain wrapper COMMANDS (ie. arena or guide)"
 	STYLES: "Functions that actually create the map image from the arena"
@@ -12,12 +13,12 @@ COMMANDS
 	flags: "Commands which only affect the automated Discord interactions (such as displaying the map or deleting the arena) which occur after an instruction list is parsed"
 	tools: ""
 	[extensions]: undefined
-#
+##
 CONSOLES
 	arena: "Functions to create an arena specialised for a particular TTG.\nA basic arena contains:\n> Width, a positive integer number of cells\n> Height, a positive integer number of cells\n> Layer_Builders, a list of named layers to stack in the order they appear\nSee COMMANDS.tools.arena for more details"
 	newGroup: "Functions to create a new group in the current arena.\nA basic group contains:\n> Name, how it is saved and retrieved\n> Colour, how the tokens are filled on the map\n> Dimensions, an overridable default value passed to new tokens on creation\n> Draw_stage, how late the group is drawn to the map (except -1 which is always last)\n> Styles, the functions that actually draw the tokens to the map\nSee CONSOLES.newGroup.(core & [arena_type]) for more details"
 	guide: "Functions to prepare new guide shapes to be drawn to the current arena.\nA CONSOLES.guide.[guide_type] will generally prepare a shape which will be drawn with STYLES.guide.[guide_type], so see that also for further clarification."
-#
+##
 STYLES
 	general: undefined
 	cell: "Styles for drawing the repeating unit (generally a filled geometric shape) used in token styles"
@@ -26,6 +27,9 @@ STYLES
 	guide: "Styles for drawing the shape (generally a geometric outline) created by calls to CONSOLES.guide"
 	light: "Styles for drawing light and/or darkness emanating from a token"
 #
+KEYWORDS
+
+##
 main.js
 	COMMANDS
 		flags
@@ -39,77 +43,46 @@ main.js
 			explain: "Get helptext and/or a list of subcategories for a given subject.\nNothing to see here you don't already understand :)"
 			arena: "Create a new arena of a given type.\nArgument options:\n> [arena_type (case-sensitive)] {additional arguments from CONSOLES.arena.[arena_type]}"
 			thread:
-				[
-					"Bump/Claim/Create/Revoke the thread of this channel's arena.\nOptions:",
-					"[send this command into the thread to claim]",
-					"[send this command into the thread to revoke]",
-					"[send this command as a reply to the message the thread to claim is built from]",
-					"ARGUMENTS: [number = id_of_channel_to_claim]",
-					"[none of the above while there is no claimed thread to create a new thread and claim it]",
-					"[none of the above while there is a claimed thread to bump and unarchive it]"
-				].join("\n> ")
-			showguide: ""
-			addguide: ""
-			setguide: ""
-			instructions: ""
-			resizearena: ""
-#
+				"A function that handles all the ways to edit and retrieve the thread being used for this channel's arena.\nOptions:"
+				+ "\nClaim a thread (skipped if there is a current thread):\n> Call 'thread [thread_id]'\n> Call 'thread' in the thread you want to claim\n> Call 'thread' as a reply to the seed message of the thread you want to claim\n> Call 'thread' to claim the most recent thread titled 'DnDaisies_Thread'"
+				+ "\nBump (and unarchive) the current thread:\n> Call 'thread' in the main channel while there is a current thread"
+				+ "\nRevoke current thread:\n> Call 'thread' in the current thread"
+				+ "\nCreate a new thread and claim it:\n> Call 'thread' (while there is no current thread) not in a thread and not as a reply to a message that seeds a thread"
+			showguide: "Display the previous guide (does not persist across calls to 'arena') on the current map\nArgument options:\n> {additional arguments from CONSOLES.showguide.[arena_type]}"
+			addguide: "Add a shape to the current guide, and display them all\nArgument options:\n> [shape (see CONSOLES.guide for options)] {additional arguments from CONSOLES.guide.[shape]}"
+			setguide: "Remove all shapes to the current guide, then optionally call addguide.\nArgument options:\n> {arguments to pass to addguide} *=> no arguments just clears current guide*"
+			instructions: "Create an instruction list that describes all groups and tokens in the current arena.\nNo arguments\nNotes:\n> Not all arena_types support this command."
+			resizearena: "Create and immediately parse an instruction list where the current arena has been expanded and, optionally, all tokens moved by some offset\nArgument options:\n> [new_width] [new_height] {horizontal_offset} {vertical_offset}\nNotes:\n> Not all arena_types support this command."
+##
 core.js
 	COMMANDS
 		//group
 			movegroup: "Move tokens (& can resize and/or edit whether hidden) in one group in ascending index order; skips removed tokens but not hidden ones.\nArgument options ('desired_positions' can instead be a rangeCSV to also resize tokens):\n> [group_name] [coordCSV = desired_positions] {t/f/! => hide/reveal/flip_whether_hidden}"
 			hidegroup: "Hide and/or reveal all tokens in one group; skips removed tokens.\nArgument options:\n> [group_name] {t/f/! => hide/reveal/flip_whether_hidden (defaults to !)}"
 			removegroup: "Delete a group and all tokens contained within.\nArgument options:\n> [group_name]"
-			resizegroup: "Change the default dimensions of a group (does not affect tokens currently on the map).\nArgument options:\n> [group_name] [coord = width-height]\n> [group_name] [some_range_with_new_dimensions]""
+			resizegroup: "Change the default dimensions of a group (does not affect tokens currently on the map).\nArgument options:\n> [group_name] [coord = width-height]\n> [group_name] [some_range_with_new_dimensions]"
 		//token
 			newtoken: "Add new tokens to a pre-existing group.\nArgument options ('desired_ranges' can instead be a coordCSV to set the tokens' dimensions to the group default):\n> [group_name] [rangeCSV = desired_ranges] {t/f => hidden/visible (defaults to f)}"
 			move: "Move (& optionally resize and/or edit whether hidden) and number of tokens in one group.\nArgument options ('desired_positions' can instead a rangeCSV to also resize the tokens)\n> [group_name]:[indexCSV] [coordCSV = desired_positions], {t/f/! => hide/reveal/flip_whether_hidden}"
 			hide: "Hide and/or reveal any number of tokens in one group.\nArgument options:\n> [group_name]:[indexCSV] {t/f/! => hide/reveal/flip_whether_hidden (defaults to !)}"
 			remove: "Remove and/or return any number of tokens within the same group; removes the group if completely empties.\nArgument options:\n> [group_name]:[indexCSV] {t/f/! => remove/return/flip_whether_removed (defaults to t)}"
 		//misc
-			distance:
-				[
-					"Measure the distance (in cells) between two points.\nArgument options (each 'coord' can accept one token):",
-					"[coord = start_point] [coord = end_point]"
-				].join("\n> ")
-			list:
-				[
-					"Create a temporary instruction list that describes the current arena.\nArgument options:",
-					"{teamCSV = teams_to_list (defaults to all)}"
-				].join("\n> ")
+			distance: "Measure the distance (in cells) between two points.\nArgument options (each 'coord' can accept one token):\n> [coord = start_point] [coord = end_point]"
+			list: "Create a temporary instruction list that describes the current arena.\nArgument options:\n> {teamCSV = teams_to_list (defaults to all)}"
 			ping: "Ping the bot.\nNo arguments"
 	CONSOLES
-		newGroup
-			core:
-				[
-					"Add some basic shortcuts and parsing for most of the mandatory fields (see CONSOLES.newGroup).",
-					"name => disregards capitalisation",
-					"colour => adds shortcuts:",
-					"> a/e/n/p => Colour: blue/red/brown/green, Team: ally/enemy/neutral/party",
-					"> g/o/w => Colour: pale_brown/grey/black, Type: ground/object/wall",
-					"> c/f/i/l => Colour: bright_green/orange/light_blue/yellow, Type: corrosive/fire/ice/lightning",
-					"> draw_stage => rounds down to nearest integer",
-					"> seeds => assumes tokens are either all visible or all hidden, so the user need only input once",
-				].join("\n")
+		//redirected
+			newGroup:
+				"Handles the majority of the required fields of a TokenGroup (see CONSOLES.newGroup); most CONSOLES.newGroup.[arena_type] functions will call this, however they may have different arguments so see their page also."
+				+ "\n> name => disregards capitalisation"
+				+ "\n> colour => adds team/type shortcuts (see KEYWORDS.colour.shortcuts)"
+				+ "\n> drawStage => rounds down to the nearest integer"
+				+ "\n> styles => takes a CSV of [layer]:[category].[style] (or [category]:[style], which assumes [layer] = [category]) and fetches the actual style functions"
+				+ "\n> seeds => builds seeds from a rangeCSV and one true/false for whether_hidden"
 		guide
-			rect:
-				[
-					"Creates an unrotated rectangular outline.\nArgument options (each 'coord' can accept one token):",
-					"[coord = a_corner] [coord = opposite_corner]",
-					"[range = a_corner:opposite_corner]"
-				].join("\n> ")
-			line:
-				[
-					"Creates a line connecting two points.\nArgument options (each 'coord' can accept one token):",
-					"[coord = start_point] [coord = end_point]",
-					"[range = start_point:end_point]"
-				].join("\n> ")
-			ellipse:
-				[
-					"Creates an unrotated elliptical outline.\nArgument options ('coord = center' can accept one token):",
-					"[coord = center] [coord = horizontal_radius-vertical_radius]",
-					"[coord = center] [int = single_radius] *=> makes circle*"
-				].join("\n> ")
+			rect: "Creates an unrotated rectangular outline.\nArgument options (each 'coord' can accept one token):\n> [coord = a_corner] [coord = opposite_corner]\n> [range = a_corner:opposite_corner]"
+			line: "Creates a line connecting two points.\nArgument options (each 'coord' can accept one token):\n> [coord = start_point] [coord = end_point]\n> [range = start_point:end_point]"
+			ellipse: "Creates an unrotated elliptical outline.\nArgument options ('coord = center' can accept one token):\n> [coord = center] [coord = horizontal_radius-vertical_radius]\n> [coord = center] [int = single_radius] *=> makes circle*"
 	STYLES
 		general
 			null: "Has no effect; just for edge cases where a style is required for some kind of check."
@@ -127,114 +100,38 @@ core.js
 		guide
 			rect: "Guide style which outlines an unrotated rectangle"
 			line: "Guide style which draws a line connecting any two points"
-			ellipse "Guide style which outlines an unrotated ellipse"
-#
+			ellipse: "Guide style which outlines an unrotated ellipse"
+##
 dnd.js
 	COMMANDS
 		//arena
-			ambient:
-				[
-					"Set the colour and opacity of the ambient shadows in the arena.\nArgument options:",
-					"[0-1 = opacity (higher is more opaque shadow)]",
-					"[0-255,0-255,0-255 = red,green,blue (higher is more colourful shadow)] {0-1 = opacity}",
-					"[0-255 = red] [0-255 = green] [0-255 = blue] {0-1 = opacity}",
-					"[0-255,0-255,0-255,0-1 = red,green,blue,opacity]"
-				].join("\n> ")
+			ambient: "Set the colour and opacity of the ambient shadows in the arena.\nArgument options:\n> [0-1 = opacity (higher is more opaque shadow)]\n> [0-255,0-255,0-255 = red,green,blue (higher is more colourful shadow)] {0-1 = opacity}\n> [0-255 = red] [0-255 = green] [0-255 = blue] {0-1 = opacity}\n> [0-255,0-255,0-255,0-1 = red,green,blue,opacity]"
 		//group
-			editlight:
-				[
-					"Edit how all tokens in a group affect the shadows in the arena.\nArgument options:",
-					"[string = name] [number = radius] [0-1 = opacity] {0-1 = proportion of radius that is uniform}",
-					"[string = name] *=> if group has once affected light, toggle effect on or off*"
-				].join("\n> ")
-			army:
-				[
-					"Tokens designed to quickly and easily represent a large group of identical creatures.\nDetails:",
-					`Calls CONSOLES.newGroup.${_extensionCode}`,
-					"draw_stage = 3",
-					"styles = cell.ellipse,token.grid,name.corner"
-					].join("\n>")
-			concentric:
-				[
-					"Tokens designed to represent 5e's mobile area of effect spells.\nDetails:",
-					`Calls CONSOLES.newGroup.${_extensionCode}`,
-					"draw_stage = 4",
-					"styles = cell.ellipse,token.concentric,name.center"
-					].join("\n> ")
-			creature:
-				[
-					"Tokens designed to represent individual entities capable of independant movement.\nDetails:",
-					`Calls CONSOLES.newGroup.${_extensionCode}`,
-					"draw_stage = -1 (always drawn last)",
-					"styles = cell.ellipse,token.image,name.center"
-					].join("\n> ")
-			grid:
-				[
-					"Tokens designed to represent 5e's static area of effect spells.\nDetails:",
-					`Calls CONSOLES.newGroup.${_extensionCode}`,
-					"draw_stage = 4",
-					"styles = cell.rect,token.grid,name.center"
-					].join("\n> ")
-			object:
-				[
-					"Tokens designed to represent objects which can be interacted with but otherwise have little-to-no agency.\nDetails:",
-					`Calls CONSOLES.newGroup.${_extensionCode}`,
-					"draw_stage = 2",
-					"styles = cell.rect,token.image"
-					].join("\n> ")
-			static:
-				[
-					"Tokens designed to represent large areas of terrain.\nDetails:",
-					`Calls CONSOLES.newGroup.${_extensionCode}`,
-					"draw_stage = 1",
-					"styles = cell.rect,token.grid"
-				].join("\n> ")
-			light:
-				[
-					"Tokens designed to represent extinguishable light/shadow sources that are otherwise static.\nDetails:",
-					`Calls CONSOLES.newGroup.${_extensionCode}`,
-					"draw_stage = 1",
-					"styles = light.gradient",
-					`NOTE: These tokens can **never** be visible; use COMMANDS.${_extensionCode}.editlight on a visible group instead`
-				].join("\n> ")
-			custom:
-				[
-					"Combine styles to design specific tokens for any purpose.\nArgument options",
-					"[name] [colour] [drawStage] [styles] [coordCSV = seed_positions] {t => hidden}",
-					"[name] [colour] [drawStage] [styles] [rangeCSV = seed_ranges] {t => hidden}\nNotes:",
-					`see CONSOLES: newGroup, newGroup.${_extensionCode} and newGroup.core for more details`,
-					"styles should be comma-separated (in any order) in the form: [layer].[style]; ie. cell.rect,name.center",
-					"if a group has a token and/or name style, it **must** also have a cell style"
-				].join("\n> ")
+			editlight: "Edit how all tokens in a group affect the shadows in the arena.\nArgument options:\n> [string = name] [number = radius] [0-1 = opacity] {0-1 = proportion of radius that is uniform}\n> [string = name] *=> if group has once affected light, toggle effect on or off*"
+
+			army: "Tokens designed to quickly and easily represent a large group of identical creatures.\nDetails:\n> draw_stage = 3\n> styles = cell.ellipse,token.grid,name.corner"
+			concentric: "Tokens designed to represent 5e's mobile area of effect spells.\nDetails:\n> draw_stage = 4\n> styles = cell.ellipse,token.concentric,name.center"
+			creature: "Tokens designed to represent individual entities capable of independant movement.\nDetails:\n> draw_stage = -1 (always drawn last)\n> styles = cell.ellipse,token.image,name.center"
+			grid: "Tokens designed to represent 5e's static area of effect spells.\nDetails:\n> draw_stage = 4\n> styles = cell.rect,token.grid,name.center"
+			object: "Tokens designed to represent objects which can be interacted with but otherwise have little-to-no agency.\nDetails:\n> draw_stage = 2\n> styles = cell.rect,token.image"
+			static: "Tokens designed to represent large areas of terrain.\nDetails:\n> draw_stage = 1\n> styles = cell.rect,token.grid"
+			light: `Tokens designed to represent extinguishable light/shadow sources that are otherwise static.\nDetails:\n> draw_stage = 1\n> styles = light.gradient\nNotes:\n> These tokens can **never** be visible; use COMMANDS.${_extensionCode}.editlight on a visible group instead`
+			custom: `Combine styles to design specific tokens for any purpose.\nNotes:\n> Directly calls CONSOLES.newGroup.[${_extensionCode}]\n> If a group has a token and/or name style, it **must** also have a cell style`
 	CONSOLES
-		arena
-			dnd: "An Arena specialised for 5e D&D - includes a light layer and guides for cones and easier positional management."
-		newGroup
-			dnd:
-				[
-					`Create a group for use in a ${_extensionCode} Arena.\nArgument options:`,
-					"[name] [colour] {_coordCSV = seed_positions} {t => hidden}",
-					"[name] [colour] {_rangeCSV = seed_ranges} {t => hidden}"
-				].join("\n> ")
+		//redirected
+			arena: "An Arena specialised for 5e D&D - includes a light layer and guides for cones and easier positional management."
+			newGroup: undefined
 		guide
-			cone:
-				[
-					"Creates a rotatable symmetrical triangle outline.\nArgument options ('coord = origin' can accept one token):",
-					"[coord = origin] [coord = height_of_triangle-base_of_triangle]",
-					"[coord = origin] [number = height_and_base_of_triangle]"
-				].join("\n> ")
-			sundail:
-				[
-					"Creates a circlular outline with a radial line to the edge.\nArgument options (each 'coord' can accept one token):",
-					"[coord = center] [coord = end_of_radial_line]",
-					"[coord = center] [number = radius]"
-				].join("\n> ")
+			cone: "Creates a rotatable symmetrical triangle outline.\nArgument options ('coord = origin' can accept one token):\n> [coord = origin] [coord = height_of_triangle-base_of_triangle]\n> [coord = origin] [number = height_and_base_of_triangle]"
+			sundail: "Creates a circlular outline with a radial line to the edge.\nArgument options (each 'coord' can accept one token):\n> [coord = center] [coord = end_of_radial_line]\n> [coord = center] [number = radius]"
+			spider: ""
 	STYLES
 		light
-			gradient: "Light style which creates a uniform circle at the center and then gradiates out to the surroundings"
-		token
-			concentric: "Token style which fills two concentric cells centered on the token; the outer cell being half as opaque as the inner"
+			gradient: "Light style which creates a uniform circle at the center and then blends out into the surroundings using a gradient"
 		guide
 			cone: "Guide style which outlines a rotateable triangle (to mimic a 5e cone spell)"
 			sundail: "Guide style which draws a line between two points and outlines the circle of points equidistant from the first"
+			spider: "Guide style which draws a series of lines emanating from one point"
+		token
+			concentric: "Token style which fills two concentric cells centered on the token; the outer cell being half as opaque as the inner"
 #

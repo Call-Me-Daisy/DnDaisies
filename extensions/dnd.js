@@ -125,223 +125,265 @@ module.exports = {
 		//--------------------------------------------------------------------STYLES
 		const STYLES = _reg.STYLES;
 		//------------------------------------LIGHT
-		STYLES.register("light", "gradient", function(_brush, _token, _args) {
-			_brush.set(_token.x, _token.y, _args.radius, _args.radius);
-			_brush.alterPos(_token.w/2, _token.h/2).alterAbs(-_brush.pM, -_brush.pM, false, false);
+		STYLES.registerCategory("light",
+			"Styles for drawing light and/or darkness emanating from a token"
+		);
 
-			const g = _brush.ctx.createRadialGradient(_brush.x, _brush.y, 0, _brush.x, _brush.y, _brush.w);
-			g.addColorStop(0, _args.shadow);
-			(_args.startFade > 0) && g.addColorStop((_args.startFade < 1) ? _args.startFade : 1, _args.shadow);
-			g.addColorStop(1, LightLayer.TRANSPARENT);
+		STYLES.register("light", "gradient",
+			function(_brush, _token, _args) {
+				_brush.set(_token.x, _token.y, _args.radius, _args.radius);
+				_brush.alterPos(_token.w/2, _token.h/2).alterAbs(-_brush.pM, -_brush.pM, false, false);
 
-			_brush.ctx.fillStyle = g;
-			_brush.alterPos(-_args.radius/2, -_args.radius/2);
-			_brush.centerScale(2.1);//Needs slight overhang bc of margins
-			_brush.fillRect();
-		});
+				const g = _brush.ctx.createRadialGradient(_brush.x, _brush.y, 0, _brush.x, _brush.y, _brush.w);
+				g.addColorStop(0, _args.shadow);
+				(_args.startFade > 0) && g.addColorStop((_args.startFade < 1) ? _args.startFade : 1, _args.shadow);
+				g.addColorStop(1, LightLayer.TRANSPARENT);
+
+				_brush.ctx.fillStyle = g;
+				_brush.alterPos(-_args.radius/2, -_args.radius/2);
+				_brush.centerScale(2.1);//Needs slight overhang bc of margins
+				_brush.fillRect();
+			},
+			"Light style which creates a uniform circle at the center and then blends out into the surroundings using a gradient"
+		);
 
 		STYLES.light.default = STYLES.general.null;
 		//------------------------------------GUIDE
-		STYLES.register("guide", "cone", function(_brush, _args) {
-			const c = Math.cos(_args.theta), s = Math.sin(_args.theta);
+		STYLES.register("guide", "cone",
+			function(_brush, _args) {
+				const c = Math.cos(_args.theta), s = Math.sin(_args.theta);
 
-			_brush.setPos(..._args.origin).alterPos(1.1*s, -1.1*c);
-			_brush.setDim(_args.radii[0] - 1, _args.radii[1] || _args.radii[0] - 1);
-			const shunt = -_brush.ctx.lineWidth/2;
-			_brush.alterAbs(shunt, shunt, shunt, shunt);
+				_brush.setPos(..._args.origin).alterPos(1.1*s, -1.1*c);
+				_brush.setDim(_args.radii[0] - 1, _args.radii[1] || _args.radii[0] - 1);
+				const shunt = -_brush.ctx.lineWidth/2;
+				_brush.alterAbs(shunt, shunt, shunt, shunt);
 
-			const dr0 = [s*_brush.w, -c*_brush.w];
-			const dr1 = [c/2*_brush.h, s/2*_brush.h];
+				const dr0 = [s*_brush.w, -c*_brush.w];
+				const dr1 = [c/2*_brush.h, s/2*_brush.h];
 
-			_brush.ctx.beginPath();
-			_brush.ctx.moveTo(_brush.x, _brush.y);
-			_brush.ctx.lineTo(_brush.x + dr0[0] - dr1[0], _brush.y + dr0[1] - dr1[1]);
-			_brush.ctx.lineTo(_brush.x + dr0[0] + dr1[0], _brush.y + dr0[1] + dr1[1]);
-			_brush.ctx.closePath();
-			_brush.ctx.stroke();
+				_brush.ctx.beginPath();
+				_brush.ctx.moveTo(_brush.x, _brush.y);
+				_brush.ctx.lineTo(_brush.x + dr0[0] - dr1[0], _brush.y + dr0[1] - dr1[1]);
+				_brush.ctx.lineTo(_brush.x + dr0[0] + dr1[0], _brush.y + dr0[1] + dr1[1]);
+				_brush.ctx.closePath();
+				_brush.ctx.stroke();
 
-			_brush.reset();
-		});
-		STYLES.register("guide", "sundail", function(_brush, _args) {
-			if (isNaN(_args.radii[0])) {
-				STYLES.guide.line(_brush, _args);
-				_args.radii = [Math.sqrt((_args.pos[0] - _args.origin[0])**2 + (_args.pos[1] - _args.origin[1])**2)];
-				STYLES.guide.ellipse(_brush, _args);
-			}
-			else {
-				STYLES.guide.ellipse(_brush, _args);
-				_args.pos = [_args.origin[0] + _args.radii[0], _args.origin[1]];
-				STYLES.guide.line(_brush, _args);
-			}
-		});
-		STYLES.register("guide", "spider", function(_brush, _args) {
-			for (const pos of _args.posLs) {
-				_args.pos = pos;
-				STYLES.guide.line(_brush, _args);
-			}
-		});
+				_brush.reset();
+			},
+			"Guide style which outlines a rotateable triangle (to mimic a 5e cone spell)"
+		);
+		STYLES.register("guide", "sundail",
+			function(_brush, _args) {
+				if (isNaN(_args.radii[0])) {
+					STYLES.guide.line(_brush, _args);
+					_args.radii = [Math.sqrt((_args.pos[0] - _args.origin[0])**2 + (_args.pos[1] - _args.origin[1])**2)];
+					STYLES.guide.ellipse(_brush, _args);
+				}
+				else {
+					STYLES.guide.ellipse(_brush, _args);
+					_args.pos = [_args.origin[0] + _args.radii[0], _args.origin[1]];
+					STYLES.guide.line(_brush, _args);
+				}
+			},
+			"Guide style which draws a line between two points and outlines the circle of points the same distance away from the first"
+		);
+		STYLES.register("guide", "spider",
+			function(_brush, _args) {
+				for (const pos of _args.posLs) {
+					_args.pos = pos;
+					STYLES.guide.line(_brush, _args);
+				}
+			},
+			"Guide style which draws a series of lines emanating from one point"
+		);
 		//------------------------------------TOKEN
-		STYLES.register("token", "concentric", function(_brush, _token, _args) {
-			STYLES.token.fill(_brush, _token, _args);
-			_brush.ctx.fillStyle = coreLayers.TokenLayer.scaleAlpha(_args.colour, 0.5);
-			_args.cell.paint(_brush.centerScale(3));
-		});
+		STYLES.register("token", "concentric",
+			function(_brush, _token, _args) {
+				STYLES.token.fill(_brush, _token, _args);
+				_brush.ctx.fillStyle = coreLayers.TokenLayer.scaleAlpha(_args.colour, 0.5);
+				_args.cell.paint(_brush.centerScale(3));
+			},
+			"Token style which fills two concentric cells centered on the token; the outer cell being half as opaque as the inner"
+		);
 		//--------------------------------------------------------------------CONSOLES
 		const CONSOLES = _reg.CONSOLES;
+		//------------------------------------REDIRECTED
+		CONSOLES.register("arena", _extensionCode,
+			function(_w, _h) {
+				const w = parseInt(_w, 10);
+				const h = parseInt(_h, 10);
+				const out = new dnd_Arena(w, h);
+
+				out.makeGroup("background", "#0000", [w - 1, h - 1], 0, {
+					cell: STYLES.cell.rect,
+					token: STYLES.token.image
+				}, [{pos: [1, 1], hidden: false}]);
+
+				return out;
+			},
+			"An Arena specialised for 5e D&D - includes a light layer and adds guides for cones and easier positional management."
+		);
+		CONSOLES.register("newGroup", _extensionCode, CONSOLES.newGroup.core);
 		//------------------------------------GUIDES
-		CONSOLES.register("guide", "cone", function(_arena, _coordAtOrigin, _radii, _theta) {
+		CONSOLES.register("guide", "cone",
+			function(_arena, _coordAtOrigin, _radii, _theta) {
 			return [STYLES.guide.cone, {
 				origin: coreParsers.coordParser.fromUnknown(_arena, _coordAtOrigin),
 				radii: (isNaN(_radii)) ? coreParsers.coordParser.fromStr(_radii) : [parseInt(_radii, 10)],
 				theta: parseInt(_theta, 10) * Math.PI/180
 			}];
-		});
-		CONSOLES.register("guide", "sundail", function(_arena, _coordAtOrigin, _posOrRadii) {
+		},
+			"Creates a rotatable symmetrical triangle outline.\nArgument options ('coord = origin' can accept one token):\n> [coord = origin] [coord = height_of_triangle-base_of_triangle]\n> [coord = origin] [number = height_and_base_of_triangle]"
+		);
+		CONSOLES.register("guide", "sundail",
+			function(_arena, _coordAtOrigin, _posOrRadii) {
 			return [STYLES.guide.sundail, {
 				origin: coreParsers.coordParser.fromUnknown(_arena, _coordAtOrigin),
 				pos: coreParsers.coordParser.fromUnknown(_arena, _posOrRadii),
 				radii: [parseInt(_posOrRadii, 10)]
 			}];
-		});
-		//------------------------------------REDIRECTED
-		CONSOLES.register("arena", _extensionCode, function(_w, _h) {
-			const w = parseInt(_w, 10);
-			const h = parseInt(_h, 10);
-			const out = new dnd_Arena(w, h);
-
-			out.makeGroup("background", "#0000", [w - 1, h - 1], 0, {
-				cell: STYLES.cell.rect,
-				token: STYLES.token.image
-			}, [{pos: [1, 1], hidden: false}]);
-
-			return out;
-		});
-		CONSOLES.register("newGroup", _extensionCode, function(_arena, _name, _colour, _drawStage, _styles, _rangeCSV, _hiddenStr) {
-			const name = _name.toLowerCase();
-			const colour = coreParsers.colourParser.fromStr(_colour);
-			const seeds = _rangeCSV && coreParsers.seedParser.fromCSV(_rangeCSV, _hiddenStr);
-			const dim = (seeds && seeds[0].dim) || [0, 0, 0];
-
-			if (!_arena.makeGroup(name, colour, dim, _drawStage, _styles, seeds)) { throw `Group ${_name} already exists`; }
-			return true;
-		});
+		},
+			"Creates a circlular outline with a radial line to the edge.\nArgument options (each 'coord' can accept one token):\n> [coord = center] [coord = end_of_radial_line]\n> [coord = center] [number = radius]"
+		);
 		//--------------------------------------------------------------------COMMANDS
 		const COMMANDS = _reg.COMMANDS;
 		//------------------------------------ARENA
-		COMMANDS.register(_extensionCode, "ambient", function(_arena, _r, _g, _b, _opacity) {
-			const layer = _arena.layers.light;
-			const rgba = [];
-			for (const val of [_r, _g, _b, _opacity]) {val && rgba.push(...val.split(","));}
-			switch (rgba.length) {
-				case 1: layer.ambientOpacity = parseFloat(rgba[0]); break;
-				case 3: layer.setShadowHue(rgba); break;
-				case 4:
-					layer.ambientOpacity = parseFloat(rgba[3]);
-					layer.setShadowHue(rgba.slice(0, 3));
-					break;
+		COMMANDS.register(_extensionCode, "ambient",
+			function(_arena, _r, _g, _b, _opacity) {
+				const layer = _arena.layers.light;
+				const rgba = [];
+				for (const val of [_r, _g, _b, _opacity]) {val && rgba.push(...val.split(","));}
+				switch (rgba.length) {
+					case 1: layer.ambientOpacity = parseFloat(rgba[0]); break;
+					case 3: layer.setShadowHue(rgba); break;
+					case 4:
+						layer.ambientOpacity = parseFloat(rgba[3]);
+						layer.setShadowHue(rgba.slice(0, 3));
+						break;
 
-				default: throw `dnd.ambient cannot take ${rgba.length} arguments`;
-			}
-			layer.shouldUpdate = true;
-		}).requires = ["arena"];
+					default: throw `dnd.ambient cannot take ${rgba.length} arguments`;
+				}
+				layer.shouldUpdate = true;
+			},
+			"Set the colour and opacity of the ambient shadows in the arena.\nArgument options:\n> [0-1 = opacity (higher is more opaque shadow)]\n> [0-255,0-255,0-255 = red,green,blue (higher is more colourful shadow)] {0-1 = opacity}\n> [0-255 = red] [0-255 = green] [0-255 = blue] {0-1 = opacity}\n> [0-255,0-255,0-255,0-1 = red,green,blue,opacity]"
+		).requires = ["arena"];
 		//------------------------------------GROUP
-		COMMANDS.register(_extensionCode, "editlight", function(_arena, _name, _radius, _opacity, _startFade) {
-			const group = _arena.requireGroup(_name.toLowerCase());
-			if (_radius && _opacity) {
-				group.styles.light = STYLES.light.gradient;
-				group.radius = parseFloat(_radius);
-				group.opacity = parseFloat(_opacity);
-				group.startFade = _startFade && parseFloat(_startFade);
-			}
-			else if (group.hasStyle("light")) {delete group.styles.light;}
-			else if (group.radius && group.opacity) {group.styles.light = STYLES.light.gradient;}
-			else {
-				console.error(`Command 'editlight ${name}...' did nothing`);
-				return {suggest: {error: true}};
-			}
+		COMMANDS.register(_extensionCode, "editlight",
+			function(_arena, _name, _radius, _opacity, _startFade) {
+				const group = _arena.requireGroup(_name.toLowerCase());
+				if (_radius && _opacity) {
+					group.styles.light = STYLES.light.gradient;
+					group.radius = parseFloat(_radius);
+					group.opacity = parseFloat(_opacity);
+					group.startFade = _startFade && parseFloat(_startFade);
+				}
+				else if (group.hasStyle("light")) {delete group.styles.light;}
+				else if (group.radius && group.opacity) {group.styles.light = STYLES.light.gradient;}
+				else {
+					console.error(`Command 'editlight ${name}...' did nothing`);
+					return {suggest: {error: true}};
+				}
 
-			_arena.layers.light.shouldUpdate = true;
-		}).requires = ["arena"];
+				_arena.layers.light.shouldUpdate = true;
+			},
+			"Edit how all tokens in a group affect the shadows in the arena.\nArgument options:\n> [string = name] [number = radius] [0-1 = opacity] {0-1 = proportion of radius that is uniform}\n> [string = name] *=> if group has once affected light, toggle effect on or off*"
+		).requires = ["arena"];
 
-		COMMANDS.register(_extensionCode, "army", function(_arena, _name, _colour, _rangeCSV) {
-			CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 3,
-				{
-					cell: STYLES.cell.ellipse,
-					token: STYLES.token.grid,
-					name: STYLES.name.corner
-				},
-				_rangeCSV
-			)
-		}).requires = ["arena"];
-		COMMANDS.register(_extensionCode, "concentric", function(_arena, _name, _colour, _rangeCSV) {
-			CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 4,
-				{
-					cell: STYLES.cell.ellipse,
-					token: STYLES.token.concentric,
-					name: STYLES.name.center
-				},
-				_rangeCSV
-			)
-		}).requires = ["arena"];
-		COMMANDS.register(_extensionCode, "creature", function(_arena, _name, _colour, _rangeCSV) {
-			CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, -1,
-				{
-					cell: STYLES.cell.ellipse,
-					token: STYLES.token.image,
-					name: STYLES.name.partial
-				},
-				_rangeCSV
-			)
-		}).requires = ["arena"];
-		COMMANDS.register(_extensionCode, "grid", function(_arena, _name, _colour, _rangeCSV) {
-			CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 4,
-				{
-					cell: STYLES.cell.rect,
-					token: STYLES.token.grid,
-					name: STYLES.name.center
-				},
-				_rangeCSV
-			)
-		}).requires = ["arena"];
-		COMMANDS.register(_extensionCode, "object", function(_arena, _name, _colour, _rangeCSV) {
-			CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 2,
-				{
-					cell: STYLES.cell.rect,
-					token: STYLES.token.image
-				},
-				_rangeCSV
-			)
-		}).requires = ["arena"];
-		COMMANDS.register(_extensionCode, "static", function(_arena, _name, _colour, _rangeCSV) {
-			CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 1,
-				{
-					cell: STYLES.cell.rect,
-					token: STYLES.token.grid
-				},
-				_rangeCSV
-			)
-		}).requires = ["arena"];
+		COMMANDS.register(_extensionCode, "army",
+			function(_arena, _name, _colour, _rangeCSV) {
+				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 3,
+					{
+						cell: STYLES.cell.ellipse,
+						token: STYLES.token.grid,
+						name: STYLES.name.corner
+					},
+					_rangeCSV
+				)
+			},
+			"Tokens designed to quickly and easily represent a large group of identical creatures.\nDetails:\n> draw_stage = 3\n> styles = cell.ellipse,token.grid,name.corner"
+		).requires = ["arena"];
+		COMMANDS.register(_extensionCode, "concentric",
+			function(_arena, _name, _colour, _rangeCSV) {
+				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 4,
+					{
+						cell: STYLES.cell.ellipse,
+						token: STYLES.token.concentric,
+						name: STYLES.name.center
+					},
+					_rangeCSV
+				)
+			},
+			"Tokens designed to represent 5e's mobile area of effect spells.\nDetails:\n> draw_stage = 4\n> styles = cell.ellipse,token.concentric,name.center"
+		).requires = ["arena"];
+		COMMANDS.register(_extensionCode, "creature",
+			function(_arena, _name, _colour, _rangeCSV) {
+				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, -1,
+					{
+						cell: STYLES.cell.ellipse,
+						token: STYLES.token.image,
+						name: STYLES.name.partial
+					},
+					_rangeCSV
+				)
+			},
+			"Tokens designed to represent individual entities capable of independant movement.\nDetails:\n> draw_stage = -1 (always drawn last)\n> styles = cell.ellipse,token.image,name.center"
+		).requires = ["arena"];
+		COMMANDS.register(_extensionCode, "grid",
+			function(_arena, _name, _colour, _rangeCSV) {
+				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 4,
+					{
+						cell: STYLES.cell.rect,
+						token: STYLES.token.grid,
+						name: STYLES.name.center
+					},
+					_rangeCSV
+				)
+			},
+			"Tokens designed to represent 5e's static area of effect spells.\nDetails:\n> draw_stage = 4\n> styles = cell.rect,token.grid,name.center"
+		).requires = ["arena"];
+		COMMANDS.register(_extensionCode, "object",
+			function(_arena, _name, _colour, _rangeCSV) {
+				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 2,
+					{
+						cell: STYLES.cell.rect,
+						token: STYLES.token.image
+					},
+					_rangeCSV
+				)
+			},
+			"Tokens designed to represent objects which can be interacted with but otherwise have little-to-no agency.\nDetails:\n> draw_stage = 2\n> styles = cell.rect,token.image"
+		).requires = ["arena"];
+		COMMANDS.register(_extensionCode, "static",
+			function(_arena, _name, _colour, _rangeCSV) {
+				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 1,
+					{
+						cell: STYLES.cell.rect,
+						token: STYLES.token.grid
+					},
+					_rangeCSV
+				)
+			},
+			"Tokens designed to represent large areas of terrain.\nDetails:\n> draw_stage = 1\n> styles = cell.rect,token.grid"
+		).requires = ["arena"];
 
-		COMMANDS.register(_extensionCode, "light", function(_arena, _name, _rangeCSV, _radius, _opacity, _startFade) {
-			CONSOLES.newGroup[_extensionCode](_arena, _name, "o", 1,
-				{
-					light: STYLES.light.gradient
-				},
-				_rangeCSV
-			);
-			COMMANDS[_extensionCode].editlight(_arena, _name, _radius, _opacity, _startFade);
-		}).requires = ["arena"];
-		COMMANDS.register(_extensionCode, "custom", function(_arena, _name, _colour, _drawStage, _styles, _rangeCSV) {
-			const styles = {};
-
-			for (const descriptor of _styles.split(",")) {
-				const layerCheck = descriptor.split(":");
-				const [styleType, styleName] = layerCheck[layerCheck.length - 1].split(".");
-				styles[(layerCheck.length > 1) ? layerCheck[0] : styleType] = STYLES[styleType][styleName];
-			}
-
-			CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, parseInt(_drawStage, 10), styles, _rangeCSV);
-		}).requires = ["arena"];
+		COMMANDS.register(_extensionCode, "light",
+			function(_arena, _name, _rangeCSV, _radius, _opacity, _startFade) {
+				CONSOLES.newGroup[_extensionCode](_arena, _name, "o", 1,
+					{
+						light: STYLES.light.gradient
+					},
+					_rangeCSV
+				);
+				COMMANDS[_extensionCode].editlight(_arena, _name, _radius, _opacity, _startFade);
+			},
+			`Tokens designed to represent extinguishable light/shadow sources that are otherwise static.\nDetails:\n> draw_stage = 1\n> styles = light.gradient\nNotes:\n> These tokens can **never** be visible; use COMMANDS.${_extensionCode}.editlight on a visible group instead`
+		).requires = ["arena"];
+		COMMANDS.register(_extensionCode, "custom",
+			function(_arena, _name, _colour, _drawStage, _styles, _rangeCSV) {
+				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, _drawStage, styles, _rangeCSV);
+			},
+			`Combine styles to design specific tokens for any purpose.\nNotes:\n> Directly calls CONSOLES.newGroup.[${_extensionCode}]\n> If a group has a token and/or name style, it **must** also have a cell style`
+		).requires = ["arena"];
 		//------------------------------------ALIAS
 		COMMANDS.addAliases(_extensionCode, "editlight", "editdark");
 		COMMANDS.addAliases(_extensionCode, "army", "swarm");

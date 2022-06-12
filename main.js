@@ -149,102 +149,156 @@ const fetchRequirement = {
 //--------------------------------------------------------------------COMMANDS
 //------------------------------------FLAGS
 COMMANDS.registerCategory("flags");
-COMMANDS.register("flags", "delete", function() {return {force: {delete: true}}});
-COMMANDS.register("flags", "keep", function() {return {force: {delete: false}}});
+COMMANDS.register("flags", "delete",
+	function() {return {force: {delete: true}}},
+	"Delete the message containing this command, unless overridden by an error or later call to COMMANDS.flags.keep"
+);
+COMMANDS.register("flags", "keep",
+	function() {return {force: {delete: false}}},
+	"Do not delete the message containing this command, unless overridden by a later call to COMMANDS.flags.delete"
+);
 
-COMMANDS.register("flags", "display", function() {return {force: {update: true, display: true}}});
-COMMANDS.register("flags", "hidden", function() {return {force: {update: false, display: false}}});
+COMMANDS.register("flags", "display",
+	function() {return {force: {update: true, display: true}}},
+	"Do not display the map of this channel's Arena, unless overridden by a later call to COMMANDS.flags.hidden"
+);
+COMMANDS.register("flags", "hidden",
+	function() {return {force: {update: false, display: false}}},
+	"Display the map of this channel's Arena, unless overridden by an error or later call to COMMANDS.flags.display"
+);
 
-COMMANDS.register("flags", "clean", function() {return {force: {timer: 1000}, suggest: {display: false}}});
-COMMANDS.register("flags", "extend", function() {return {force: {timer: Holder.defaultTimer}, suggest: {display: false}}});
+COMMANDS.register("flags", "clean",
+	function() {return {force: {timer: 1000}, suggest: {display: false}}},
+	"Trigger the autodeletion of this channel's Arena, unless overridden by an error or later call to COMMANDS.flags.extend"
+);
+COMMANDS.register("flags", "extend",
+	function() {return {force: {timer: Holder.defaultTimer}, suggest: {display: false}}},
+	"Reset the autodeletion timer of this channel's Arena, unless overridden by an error or later call to COMMANDS.flags.clean"
+);
 //------------------------------------TOOLS
-COMMANDS.register("tools", "explain", function(_msg, _key) {
-	let toExplain = REG;
-	if (_key) {
-		for (const keyPart of _key.split(".")) {toExplain = toExplain[keyPart];}
-	}
-	toExplain.explainText &&	minorUtils.makeTemp(_msg.channel.send(toExplain.explainText));
-	console.log(toExplain)
-	return {display: false};
-}).requires = ["message"];
+COMMANDS.register("tools", "explain",
+	function(_msg, _key) {
+		let toExplain = REG;
+		if (_key) {
+			for (const keyPart of _key.split(".")) {toExplain = toExplain[keyPart];}
+		}
+		toExplain.explainText &&	minorUtils.makeTemp(_msg.channel.send(toExplain.explainText));
+		return {display: false};
+	},
+	"Get helptext and/or a list of subcategories for a given subject.\nNothing to see here you don't already understand :)"
+).requires = ["message"];
 
-COMMANDS.register("tools", "arena", function(_msg, _arenaType) {
-	const arenaType = _arenaType.toLowerCase();
-	const arenaBuilder = CONSOLES.arena[arenaType];
-	if (!arenaBuilder) { throw `Arena type, ${_arenaType}, is undefined`; }
+COMMANDS.register("tools", "arena",
+	function(_msg, _arenaType) {
+		const arenaType = _arenaType.toLowerCase();
+		const arenaBuilder = CONSOLES.arena[arenaType];
+		if (!arenaBuilder) { throw `Arena type, ${_arenaType}, is undefined`; }
 
-	const holder = Holder.ensure(_msg.channel);
-	holder.arena = new arenaBuilder(...sliceArgs(arguments, 2));
-	holder.arenaType = arenaType;
-}).requires = ["message"];
-COMMANDS.register("tools", "thread", async function(_msg, _channelId) {
-	const holder = Holder.ensure(_msg.channel);
+		const holder = Holder.ensure(_msg.channel);
+		holder.arena = new arenaBuilder(...sliceArgs(arguments, 2));
+		holder.arenaType = arenaType;
+	},
+	"Create a new arena of a given type.\nArgument options:\n> [arena_type (case-sensitive)] {see CONSOLES.arena.[arena_type] for additional arguments}"
+).requires = ["message"];
+COMMANDS.register("tools", "thread",
+	async function(_msg, _channelId) {
+		const holder = Holder.ensure(_msg.channel);
 
-	if (!(holder.thread && (holder.thread = await bot.fetchChannel(holder.thread.id)))) {
-		let foo;
-		if (_msg.channel instanceof ThreadChannel) {
-			holder.claimThread(_msg.channel);
+		if (!(holder.thread && (holder.thread = await bot.fetchChannel(holder.thread.id)))) {
+			let foo;
+			if (_msg.channel instanceof ThreadChannel) {
+				holder.claimThread(_msg.channel);
+			}
+			else if (_channelId && (foo = await bot.fetchChannel(_channelId)) instanceof ThreadChannel) {
+				holder.claimThread(foo);
+			}
+			else if (_msg.reference !== null && (foo = await bot.fetchReference(_msg))) {
+				holder.claimThread(await bot.fetchChannel(foo.id));
+			}
+			else if (foo = await _msg.channel.threads.cache.find(x => x.name = "DnDaisies_Thread")) {
+				holder.claimThread(foo);
+			}
+			else {
+				holder.claimThread(await holder.channel.send("TO_DO: New Thread Prompt").then((_anchor) => {
+					return _anchor.startThread({name: "DnDaisies_Thread", autoArchiveDuration: 60});
+				}));
+				return {suggest: {display: false}};
+			}
+			holder.arena && holder.arena.updateGroupLayers();
+			return;
 		}
-		else if (_channelId && (foo = await bot.fetchChannel(_channelId)) instanceof ThreadChannel) {
-			holder.claimThread(foo);
-		}
-		else if (_msg.reference !== null && (foo = await bot.fetchReference(_msg))) {
-			holder.claimThread(await bot.fetchChannel(foo.id));
-		}
-		else if (foo = await _msg.channel.threads.cache.find(x => x.name = "DnDaisies_Thread")) {
-			holder.claimThread(foo);
-		}
-		else {
-			holder.claimThread(await holder.channel.send("TO_DO: New Thread Prompt").then((_anchor) => {
-				return _anchor.startThread({name: "DnDaisies_Thread", autoArchiveDuration: 60});
+		if (_msg.channel.id !== holder.thread.id) {
+			holder.thread.setArchived(false);
+			minorUtils.makeTemp(bot.fetchMessage(holder.channel.id, holder.thread.id).then((_anchor) => {
+				return _anchor && _anchor.reply("bump");
 			}));
 			return {suggest: {display: false}};
 		}
-		holder.arena && holder.arena.updateGroupLayers();
-		return;
-	}
-	if (_msg.channel.id !== holder.thread.id) {
-		holder.thread.setArchived(false);
-		minorUtils.makeTemp(bot.fetchMessage(holder.channel.id, holder.thread.id).then((_anchor) => {
-			return _anchor && _anchor.reply("bump");
-		}));
-		return {suggest: {display: false}};
-	}
 
-	holder.revokeThread();
-	return {suggest: {display: holder.arena && holder.arena.updateGroupLayers()}};
-}).requires = ["message"];
+		holder.revokeThread();
+		return {suggest: {display: holder.arena && holder.arena.updateGroupLayers()}};
+	},
+	"A function that handles all the ways to edit and retrieve the thread being used for this channel's arena.\nOptions:"
+	+ "\nClaim an existing thread (skipped if there is a current thread):\n> Call 'thread [thread_id]'\n> Call 'thread' in the thread you want to claim\n> Call 'thread' as a reply to the seed message of the thread you want to claim\n> Call 'thread' to claim the most recent thread titled 'DnDaisies_Thread'"
+	+ "\nCreate a new thread and claim it (skipped if there is a current thread):\n> Call 'thread' not in a thread and not as a reply to a message that seeds a thread"
+	+ "\nBump (and unarchive) the current thread:\n> Call 'thread' in the main channel while there is a current thread"
+	+ "\nRevoke current thread:\n> Call 'thread' in the current thread"
+).requires = ["message"];
 
-COMMANDS.register("tools", "showguide", function(_arena) {
-	return {suggest: {display: _arena.showGuide(...sliceArgs(arguments, 1)).hasShape()}};
-}).requires = ["arena"];
-COMMANDS.register("tools", "addguide", function(_holder, _arena, _guideType) {
-	const guideBuilder = CONSOLES.guide[_guideType.toLowerCase()];
-	if (guideBuilder === undefined) { throw `GuideType, ${_guideType}, is undefined`; }
+COMMANDS.register("tools", "showguide",
+	function(_arena) {
+		return {suggest: {display: _arena.showGuide(...sliceArgs(arguments, 1)).hasShape()}};
+	},
+	"Display the previous guide (does not persist across calls to 'arena') on the current map\nArgument options:\n> {additional arguments from CONSOLES.showguide[arena_type]}"
+).requires = ["arena"];
+COMMANDS.register("tools", "addguide",
+	function(_holder, _arena, _guideType) {
+		const guideBuilder = CONSOLES.guide[_guideType.toLowerCase()];
+		if (guideBuilder === undefined) { throw `GuideType, ${_guideType}, is undefined`; }
 
-	_arena.addGuide(...guideBuilder(_arena, ...sliceArgs(arguments, 3)));
-}).requires = ["holder", "arena"];
-COMMANDS.register("tools", "setguide", function(_holder, _arena, _guideType) {
-	_arena.clearGuide();
-	if (_guideType === undefined) {return {suggest: {display: false}};}
+		_arena.addGuide(...guideBuilder(_arena, ...sliceArgs(arguments, 3)));
+	},
+	"Add a shape to the current guide, and display them all\nArgument options:\n> [shape (see CONSOLES.guide for options)] {additional arguments from CONSOLES.guide.[shape]}"
+).requires = ["holder", "arena"];
+COMMANDS.register("tools", "setguide",
+	function(_holder, _arena, _guideType) {
+		_arena.clearGuide();
+		if (_guideType === undefined) {return {suggest: {display: false}};}
 
-	COMMANDS.tools.addguide(...arguments);
-}).requires = ["holder", "arena"];
+		COMMANDS.tools.addguide(...arguments);
+	},
+	"Remove all shapes to the current guide, then optionally call addguide.\nArgument options:\n> {arguments to pass to addguide} *=> no arguments just clears current guide*"
+).requires = ["holder", "arena"];
 
-COMMANDS.register("tools", "resizearena", function(_holder, _arena, _w, _h, _dx, _dy) {
-	if (!_arena.canResize) { throw `Arena Type ${_holder.arenaType} cannot be resized`; }
-	const w = parseInt(_w, 10);
-	const h = parseInt(_h, 10);
-	if (isNaN(w) || isNaN(h)) { throw `Invalid new dimensions: [${_w}, ${_h}]`; }
+COMMANDS.register("tools", "instructions",
+	function(_holder, _arena) {
+		const instructions = _holder.makeInstructionList();
+		if (!instructions) {
+			console.error(`Call to ${holder.arenaType}.makeInstructionList returned false`);
+			return {suggest: {error: true}};
+		}
+		_holder.channel.send(instructions);
+		return {suggest: {display: false, timer: false}};
+	},
+	"Create an instruction list that describes all groups and tokens in the current arena.\nNo arguments\nNotes:\n> Not all arena_types support this command."
+).requires = ["holder", "arena"];
+COMMANDS.register("tools", "resizearena",
+	function(_holder, _arena, _w, _h, _dx, _dy) {
+		if (!_arena.canResize) { throw `Arena Type ${_holder.arenaType} cannot be resized`; }
+		const w = parseInt(_w, 10);
+		const h = parseInt(_h, 10);
+		if (isNaN(w) || isNaN(h)) { throw `Invalid new dimensions: [${_w}, ${_h}]`; }
 
-	const instructions = _holder.makeInstructionList(w, h, _dx && parseInt(_dx, 10), _dy && parseInt(_dy, 10));
-	if (!instructions) { throw `Cannot generate instructions for arena ${_holder.channel.id} to be resized`; }
+		const instructions = _holder.makeInstructionList(w, h, _dx && parseInt(_dx, 10), _dy && parseInt(_dy, 10));
+		if (!instructions) { throw `Cannot generate instructions for arena ${_holder.channel.id} to be resized`; }
 
-	_holder.channel.send(instructions + `\n${PREFIX}display`).then((_msg) => {
-		parseMessage(_msg, {delete: true});
-	});
-	return {force: {update: false, display: false, delete: true}};
-}).requires = ["holder", "arena"];
+		_holder.channel.send(instructions + `\n${PREFIX}display`).then((_msg) => {
+			parseMessage(_msg, {delete: true});
+		});
+		return {force: {update: false, display: false, delete: true}};
+	},
+	"Create and immediately parse an instruction list where the current arena has been expanded and, optionally, all tokens moved by some offset\nArgument options:\n> [new_width] [new_height] {horizontal_offset} {vertical_offset}\nNotes:> Not all arena_types support this command."
+).requires = ["holder", "arena"];
 //------------------------------------ALIAS
 COMMANDS.addAliases("flags", "display", "map");
 COMMANDS.addAliases("flags", "hidden", "nomap");

@@ -1,40 +1,51 @@
 const fs = require("fs");
 
 const {Registry} = require("cmdaisy-utils").general;
-//--------------------------------------------------------------------CONSTANTS
+//--------------------------------------------------------------------EXPLAINREGISTRY
 class ExplainCategory extends Registry.Category {
-	static missingExplainText = "No explanation available";
+	static missingExplainText = "No explanation available / No additional arguments";
+	static createCategoryTitle(_handle, _explainText, _listUnder) {return `**${_handle}**\n${_explainText}\n\n__${_listUnder}__`;}
+
 	static build() {return new ExplainCategory(...arguments);}
 	constructor(_categoryName, _explainText = ExplainCategory.missingExplainText, _extension = "") {
 		super(_categoryName, _extension + "Explain");
-		this.explainText = _explainText;
+		this.explainText = ExplainCategory.createCategoryTitle(this.handle, _explainText, "Options");
 	}
 
 	register(_elementName, _element, _explainText = ExplainCategory.missingExplainText) {
+		this.explainText += "\n> " + _elementName;
 		_element.explainText = _explainText;
 		return super.register(_elementName, _element);
 	}
 }
 class ExplainRegistry extends Registry {
 	static build() {return new ExplainRegistry(...arguments);}
-	constructor(_handle, _explainText = ExplainCategory.missingExplainText, _makeCategory = ExplainCategory.build, _extension = "") {
-		super(_handle, _makeCategory, _extension + "Explain");
-		this.explainText = _explainText;
+	constructor(_handle, _explainText = ExplainCategory.missingExplainText, _makeCategory = ExplainCategory.build) {
+		super(_handle, _makeCategory, "Explain");
+		this.explainText = ExplainCategory.createCategoryTitle(this.handle, _explainText, "Categories");
+	}
+
+	registerCategory(_handle) {
+		this.explainText += "\n> " + _handle;
+		return super.registerCategory(...arguments);
 	}
 }
-
-const REGISTRIES = new ExplainRegistry(
-	"REG",
-	"__Categories__\nFor more detail about a subject call 'explain [CATEGORY].{subcategory}.{handle}' (case-sensitive), ie.\n> explain COMMANDS\n> explain CONSOLES.newGroup.dnd",
+//--------------------------------------------------------------------CONSTANTS
+const REG = new ExplainRegistry(
+	"__DnDaisies__",
+	"For more detail about a subject call 'explain [Category].{Subcategory}.{etc}' (case-sensitive), ie.\n> explain COMMANDS\n> explain CONSOLES.newGroup.dnd",
 	ExplainRegistry.build
 );
-REGISTRIES.registerCategory("COMMANDS",
+REG.registerCategory("KEYWORDS",
+	"Shorthand names that will be used throughout the help text for this bot"
+);
+REG.registerCategory("COMMANDS",
 	"Functions called directly by the user; can take any number of (space-separated) arguments"
 );
-REGISTRIES.registerCategory("CONSOLES",
+REG.registerCategory("CONSOLES",
 	"Subcommands called by certain wrapper COMMANDS (ie. arena or guide)"
 );
-REGISTRIES.registerCategory("STYLES",
+REG.registerCategory("STYLES",
 	"Functions that actually create the map image from the arena"
 );
 //--------------------------------------------------------------------MAIN
@@ -54,8 +65,11 @@ fs.readdir(dir, (dir_e, files) => {
 	}
 
 	for (const stage of Object.values(stages)) {
-		for (const extension of stage) {extension.register(extension.root, REGISTRIES);}
+		for (const extension of stage) {
+			REG.COMMANDS.registerCategory(extension.root, `Commands specific to the the '${extension.root}' extension`);
+			extension.register(extension.root, REG);
+		}
 	}
 })
 //--------------------------------------------------------------------FINALIZE
-module.exports = REGISTRIES;
+module.exports = REG;
