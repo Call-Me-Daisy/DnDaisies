@@ -221,29 +221,49 @@ module.exports = {
 
 				return out;
 			},
-			"An Arena specialised for 5e D&D - includes a light layer and adds guides for cones and easier positional management."
+			"An Arena specialised for 5e D&D.\nAdds...\n> STYLES.token.concentric\n> STYLES.guide: .cone, .sundail, .spider\nLayers:\n> token; draws the main body of the token\n> light; draws the ambient shadows, and any light/shadows emitted by tokens\n> name; draws identifiers to tokens that should be distinguishable\n> guide; draws free-place geometric guides for easier visualisation of movement, spells, etc."
 		);
 		CONSOLES.register("newGroup", _extensionCode, CONSOLES.newGroup.core);
 		//------------------------------------GUIDES
 		CONSOLES.register("guide", "cone",
-			function(_arena, _coordAtOrigin, _radii, _theta) {
-			return [STYLES.guide.cone, {
-				origin: coreParsers.coordParser.fromUnknown(_arena, _coordAtOrigin),
-				radii: (isNaN(_radii)) ? coreParsers.coordParser.fromStr(_radii) : [parseInt(_radii, 10)],
-				theta: parseInt(_theta, 10) * Math.PI/180
-			}];
-		},
-			"Creates a rotatable symmetrical triangle outline.\nArgument options ('coord = origin' can accept one token):\n> [coord = origin] [coord = height_of_triangle-base_of_triangle]\n> [coord = origin] [number = height_and_base_of_triangle]"
+			function(_arena, _coordAtOrigin, _theta, _heightOfCone, _diameterAtBase) {
+				const height = parseFloat(_heightOfCone);
+				return [STYLES.guide.cone, {
+					origin: coreParsers.coordParser.fromUnknown(_arena, _coordAtOrigin),
+					theta: parseInt(_theta, 10) * Math.PI/180,
+					radii: [height, (_diameterAtBase) ? parseFloat(_diameterAtBase)/2 : height/2]
+				}];
+			},
+			"Creates a rotatable symmetrical triangle outline.\nArgument options (each 'coord' can accept one token):\n> [coord = origin] [degrees_clockwise_from_straight_up] [height_of_triangle] {base_of_triangle (defaults to height_of_triangle)}"
 		);
 		CONSOLES.register("guide", "sundail",
 			function(_arena, _coordAtOrigin, _posOrRadii) {
-			return [STYLES.guide.sundail, {
-				origin: coreParsers.coordParser.fromUnknown(_arena, _coordAtOrigin),
-				pos: coreParsers.coordParser.fromUnknown(_arena, _posOrRadii),
-				radii: [parseInt(_posOrRadii, 10)]
-			}];
-		},
+				return [STYLES.guide.sundail, {
+					origin: coreParsers.coordParser.fromUnknown(_arena, _coordAtOrigin),
+					pos: coreParsers.coordParser.fromUnknown(_arena, _posOrRadii),
+					radii: [parseInt(_posOrRadii, 10)]
+				}];
+			},
 			"Creates a circlular outline with a radial line to the edge.\nArgument options (each 'coord' can accept one token):\n> [coord = center] [coord = end_of_radial_line]\n> [coord = center] [number = radius]"
+		);
+		CONSOLES.register("guide", "spider",
+			function(_arena, _coordAtOrigin, _coordCSVOrGroupName) {
+				const group = _arena.fetchGroup(_coordCSVOrGroupName);
+				let posLs;
+				if (!group) {posLs = coreParsers.coordParser.fromCSV(_coordCSVOrGroupName);}
+				else {
+					posLs = [];
+					for (const token of group.tokens) {
+						!(token.hidden || token.removed) && posLs.push(coreParsers.coordParser.fromToken(token));
+					}
+				}
+
+				return [STYLES.guide.spider, {
+					origin: coreParsers.coordParser.fromUnknown(_arena, _coordAtOrigin),
+					posLs
+				}];
+			},
+			"Creates a collection of lines all emanating out from a single point.\nArgument options('coord = origin' can accept one token):\n> [coord = origin] [coordCSV = end_of_lines]\n> [coord = origin] [string = group_name]"
 		);
 		//--------------------------------------------------------------------COMMANDS
 		const COMMANDS = _reg.COMMANDS;
@@ -368,7 +388,7 @@ module.exports = {
 
 		COMMANDS.register(_extensionCode, "light",
 			function(_arena, _name, _rangeCSV, _radius, _opacity, _startFade) {
-				CONSOLES.newGroup[_extensionCode](_arena, _name, "o", 1,
+				CONSOLES.newGroup[_extensionCode](_arena, _name, "v", 1,
 					{
 						light: STYLES.light.gradient
 					},
@@ -380,7 +400,7 @@ module.exports = {
 		).requires = ["arena"];
 		COMMANDS.register(_extensionCode, "custom",
 			function(_arena, _name, _colour, _drawStage, _styles, _rangeCSV) {
-				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, _drawStage, styles, _rangeCSV);
+				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, _drawStage, _styles, _rangeCSV);
 			},
 			`Combine styles to design specific tokens for any purpose.\nNotes:\n> Directly calls CONSOLES.newGroup.[${_extensionCode}]\n> If a group has a token and/or name style, it **must** also have a cell style`
 		).requires = ["arena"];

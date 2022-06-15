@@ -2,6 +2,9 @@ ssh/
 npm*
 node*
 a_*
+
 .env
 package-lock.json
+
 cache/*
+explain.txt

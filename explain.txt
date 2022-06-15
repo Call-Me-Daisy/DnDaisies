@@ -1,19 +1,15 @@
-CONCEPTS
-	colourShortcuts: "Common teams (ally/enemy/party/etc) or types (fire/ice/ground/wall/etc) that have an assigned colour.\nCan be used instead of hex-code to specify a colour - either as the whole word, or just the first letter."
-
-	REG: "__Categories__\nFor more detail about a subject call 'explain [CATEGORY].{subcategory}.{handle}' (case-sensitive), ie.\n> explain COMMANDS\n> explain CONSOLES.newGroup.dnd"
-##
 REG
-	KEYWORDS: "Shorthand names that will be used throughout the help text for this bot"
+	KEYWORDS: "Shorthand names and conventions that will be used throughout the helptext for this bot"
 	COMMANDS: "Functions called directly by the user\nCan take any number of (space-separated) arguments"
 	CONSOLES: "Subcommands called by certain wrapper COMMANDS (ie. arena or guide)"
 	STYLES: "Functions that actually create the map image from the arena"
-#
+##
+
 COMMANDS
 	flags: "Commands which only affect the automated Discord interactions (such as displaying the map or deleting the arena) which occur after an instruction list is parsed"
 	tools: ""
 	[extensions]: undefined
-##
+#
 CONSOLES
 	arena: "Functions to create an arena specialised for a particular TTG.\nA basic arena contains:\n> Width, a positive integer number of cells\n> Height, a positive integer number of cells\n> Layer_Builders, a list of named layers to stack in the order they appear\nSee COMMANDS.tools.arena for more details"
 	newGroup: "Functions to create a new group in the current arena.\nA basic group contains:\n> Name, how it is saved and retrieved\n> Colour, how the tokens are filled on the map\n> Dimensions, an overridable default value passed to new tokens on creation\n> Draw_stage, how late the group is drawn to the map (except -1 which is always last)\n> Styles, the functions that actually draw the tokens to the map\nSee CONSOLES.newGroup.(core & [arena_type]) for more details"
@@ -26,10 +22,35 @@ STYLES
 	name: "Styles for drawing a token's identifier (generally 2-3 characters, based on its given name)"
 	guide: "Styles for drawing the shape (generally a geometric outline) created by calls to CONSOLES.guide"
 	light: "Styles for drawing light and/or darkness emanating from a token"
-#
-KEYWORDS
-
 ##
+KEYWORDS
+	Interactions: "Instructions for the user when operating the bot"
+	CodeObjects: "In-code objects that can be manipulated through commands"
+	UserInput: "Objects used in-code but specified in-command by the user (and how to do so)"
+##
+
+Interactions
+	SquareBrackets: "[some_argument] => [some_argument] is necessary for the command or object to work as intended"
+	CurlyBrackets: "{some_argument} => {some_argument} is an optional addition for the command or object (generally comes with a default value)"
+	Call: "call '[some_command]' => send '--[some_command]' as a message to this channel"
+	See: "see [some_topic] => call 'explain [some_topic]' and read the resulting helptext"
+##
+CodeObjects
+	Arena: "The in-code container housing all of the groups, tokens, styles, etc. used to build the map"
+	Map: "The image generated to represent the arena, and the message it is attached to"
+	Group: "A collection of identical tokens, and how they are actually referenced and drawn to the map (for efficiency and usability reasons)"
+	Token: "A changeable (move/resize/hide/remove) feature of the arena; highly variable due to the system of combining styles"
+##
+UserInput
+	CSV: "'Comma-Separated Variable' - how this bot accepts lists; [object]CSV represents any number of that object separated by only a comma, ie.\n> 1,2,3 could be an indexCSV\n> A1 could be a coordCSV (of length 1, so no separator is required)\n> B2, C3 is not a coordCSV (due to the space)"
+	TokenTup: "A string that the arena uses to fetch a particular token or set of tokens (within the same group); specified by...\n> If group contains many tokens: [name of group]**:**[indexCSV]\n> If group contains single token [name of group]{**:**0}"
+	Colour: "A colour in hex-code (#rgba); can be specified directly or through one of the following presets (case-insensitive; only first letter is required)...\n>Colours: red, green, blue, yellow, magenta, cyan, white\n>Teams: party (dark green), enemy (dark red), ally (dark blue), neutral (brown)\n>Types: dirt (pale brown), stone (pale grey), fire (orange), ice (pale blue), lightning (dark yellow), toxic (dark magenta)"
+	Coord: "A point in 3D space (displays as 2D, but invisibly tracks height above the arena ground); can be specified numerically or using the in-built coordinate helper...\n> Numerically: [horizontal position, in cells]**-**[vertical position, in cells]{**-**height, in cells (defaults to 0)}\n> Coordinate: [letter (case sensitive)][number]{**-**height, in cells (defaults to 0)}"
+	Range: "A series of rectangular areas, overlapping the previous area at the corner to create a snake; specified by:\n> [first_corner]**:**[second_corner]{**:**etc.}\nNote that there can be a rangeCSV (ie. B2:B3:C3,E5:G7), but that there will be no overlap across the comma; it just creates a new range for each"
+	Span: "A range with two corners (enough to fully describe both position and dimensions of a token); specified by:\n> [first_corner]:{second_corner (defaults to first_corner + 1-1-1)}"
+	Seed: "All of the mandatory fields for a new token - position, dimension, and whether_hidden; specified by:\n> [spanCSV] {whether_hidden (defaults to false)}"
+##
+
 main.js
 	COMMANDS
 		flags
@@ -77,7 +98,7 @@ core.js
 				+ "\n> name => disregards capitalisation"
 				+ "\n> colour => adds team/type shortcuts (see KEYWORDS.colour.shortcuts)"
 				+ "\n> drawStage => rounds down to the nearest integer"
-				+ "\n> styles => takes a CSV of [layer]:[category].[style] (or [category]:[style], which assumes [layer] = [category]) and fetches the actual style functions"
+				+ "\n> styles => takes a CSV of [layer]:[category].[style] (or [category]:[style], which assumes [layer] = [category]) and sets the group to draw to [layer] with the [category].[style] function"
 				+ "\n> seeds => builds seeds from a rangeCSV and one true/false for whether_hidden"
 		guide
 			rect: "Creates an unrotated rectangular outline.\nArgument options (each 'coord' can accept one token):\n> [coord = a_corner] [coord = opposite_corner]\n> [range = a_corner:opposite_corner]"
@@ -115,16 +136,16 @@ dnd.js
 			grid: "Tokens designed to represent 5e's static area of effect spells.\nDetails:\n> draw_stage = 4\n> styles = cell.rect,token.grid,name.center"
 			object: "Tokens designed to represent objects which can be interacted with but otherwise have little-to-no agency.\nDetails:\n> draw_stage = 2\n> styles = cell.rect,token.image"
 			static: "Tokens designed to represent large areas of terrain.\nDetails:\n> draw_stage = 1\n> styles = cell.rect,token.grid"
-			light: `Tokens designed to represent extinguishable light/shadow sources that are otherwise static.\nDetails:\n> draw_stage = 1\n> styles = light.gradient\nNotes:\n> These tokens can **never** be visible; use COMMANDS.${_extensionCode}.editlight on a visible group instead`
-			custom: `Combine styles to design specific tokens for any purpose.\nNotes:\n> Directly calls CONSOLES.newGroup.[${_extensionCode}]\n> If a group has a token and/or name style, it **must** also have a cell style`
+			light: `Tokens designed to represent extinguishable light/shadow sources that are otherwise static.\nDetails:\n> draw_stage = 1\n> styles = light.gradient\nNotes:\n> These tokens can never be visible; use COMMANDS.${_extensionCode}.editlight on a visible group instead`
+			custom: `Combine styles to design specific tokens for any purpose.\nNotes:\n> Directly calls CONSOLES.newGroup.[${_extensionCode}]\n> If a group has a token and/or name style, it must also have a cell style`
 	CONSOLES
 		//redirected
-			arena: "An Arena specialised for 5e D&D - includes a light layer and guides for cones and easier positional management."
+			arena: "An Arena specialised for 5e D&D.\nAdds...\n> STYLES.token.concentric\n> STYLES.guide: .cone, .sundail, .spider\nLayers:\n> token; draws the main body of the token\n> light; draws the ambient shadows, and any light/shadows emitted by tokens\n> name; draws identifiers to tokens that should be distinguishable\n> guide; draws free-place geometric guides for easier visualisation of movement, spells, etc."
 			newGroup: undefined
 		guide
-			cone: "Creates a rotatable symmetrical triangle outline.\nArgument options ('coord = origin' can accept one token):\n> [coord = origin] [coord = height_of_triangle-base_of_triangle]\n> [coord = origin] [number = height_and_base_of_triangle]"
+			cone: "Creates a rotatable symmetrical triangle outline.\nArgument options (each 'coord' can accept one token):\n> [coord = origin] [number = height_of_triangle] {number = base_of_triangle (defaults to height_of_triangle)}"
 			sundail: "Creates a circlular outline with a radial line to the edge.\nArgument options (each 'coord' can accept one token):\n> [coord = center] [coord = end_of_radial_line]\n> [coord = center] [number = radius]"
-			spider: ""
+			spider: "Creates a collection of lines all emanating out from a single point.\nArgument options('coord = origin' can accept one token):\n> [coord = origin] [coordCSV = end_of_lines]\n> [coord = origin] [string = group_name]"
 	STYLES
 		light
 			gradient: "Light style which creates a uniform circle at the center and then blends out into the surroundings using a gradient"
@@ -134,4 +155,4 @@ dnd.js
 			spider: "Guide style which draws a series of lines emanating from one point"
 		token
 			concentric: "Token style which fills two concentric cells centered on the token; the outer cell being half as opaque as the inner"
-#
+##

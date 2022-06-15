@@ -1,7 +1,7 @@
 require("dotenv").config();
 
 const fs = require("fs");
-const {Intents, MessageAttachment, TextChannel, ThreadChannel} = require("discord.js");
+const {Intents, TextChannel, ThreadChannel, MessageAttachment, Permissions} = require("discord.js");
 
 const [{sliceArgs}, {DiscordBot, DiscordCleaner}] = require("cmdaisy-utils").unpack("general", "discord");
 
@@ -12,7 +12,7 @@ const {COMMANDS, CONSOLES} = REG;
 const PREFIX = "--";
 const instructionDir = "./cache/";
 
-const bot = new DiscordBot({intents: [
+const BOT = new DiscordBot({intents: [
 	Intents.FLAGS.GUILDS,
 	Intents.FLAGS.GUILD_MESSAGES
 ]});
@@ -25,7 +25,7 @@ class Holder {
 		return Holder.collection.get(_channelId);
 	}
 	static fetch(_channel) {
-		return Holder.get(((_channel instanceof ThreadChannel) ? bot.fetchCachedChannel(_channel.parentId) : _channel).id);
+		return Holder.get(((_channel instanceof ThreadChannel) ? BOT.fetchCachedChannel(_channel.parentId) : _channel).id);
 	}
 	static ensure(_channel) {
 		return Holder.fetch(_channel) || new Holder(_channel);
@@ -100,45 +100,15 @@ class Holder {
 		return true;
 	}
 }
-//--------------------------------------------------------------------MACROS
-function doLog(_msg, _key) {
-	let toLog;
-	if (_key) {
-		console.log((function(_lckey){
-			switch (_lckey[0]) {
-				case "c": return _msg.channel;
-				case "g":
-					return (_lckey[1] === "c") ? _msg.guild.channels : _msg.guild;
-
-				default: return _msg;
-			}
-		})(_key.toLowerCase()));
-	}
-	else if (_msg.reference !== null) {
-		bot.fetchReference(_msg).then((_ref) => {console.log(_ref);});
-	}
-	else {
-		console.error(`log macro did nothing`);
-	}
-}
-function doClearMessages(_msg, _limit = 100) {
-	_msg.channel.messages.fetch({limit: _limit}).then((_fetchedMsg) => {
-		const notPinned = _fetchedMsg.filter((message) => !(message.pinned || bot.fetchCachedChannel(message.id)));
-		_msg.channel.bulkDelete(notPinned, true);
-	}).catch(err => console.error(err));
-}
-function doQuit() {
-	for (const [id, holder] of Holder.collection.entries()) {Holder.clean(holder, true);}
-	setTimeout(function() {bot.destroy();}, 1500);
-}
-
-function doTest(_msg) {
-
-}
-
+//--------------------------------------------------------------------COMMANDS
+//------------------------------------COMMANDHELPERS
+const permissions = {
+	isBotAdmin: function(_msg) {return _msg.author.id === process.env.ADMIN_ID;},
+	manageMessages: function(_msg) {return _msg.member.permissions.has(Permissions.FLAGS.MANAGE_MESSAGES);}
+};
 const fetchRequirement = {
-	bot: function(_msg) {return bot;},
-	message: function(_msg) {return _msg;},
+	bot: function(_msg) {return BOT;},
+	msg: function(_msg) {return _msg;},
 	holder: function(_msg) {return Holder.require(_msg.channel);},
 	arena: function(_msg) {
 		const out = Holder.fetch(_msg.channel).arena;
@@ -146,49 +116,109 @@ const fetchRequirement = {
 		return out;
 	}
 };
-//--------------------------------------------------------------------COMMANDS
+//------------------------------------MACROS
+COMMANDS.registerCategory("Macros",
+	"Commands that cannot be used within an instruction list, as they would prevent other commands from operating as intended"
+);
+
+COMMANDS.register("Macros", "parse",
+	async function(_msg) {
+		const ref = await BOT.fetchReference(_msg);
+		if (!ref) {return false;}
+		DiscordCleaner.delete(_msg);
+		return [ref, {delete: ref.author.id === BOT.user.id}];
+	},
+	"Call this as a reply to a message containing an instruction list to parse that instruction list instead."
+);
+COMMANDS.register("Macros", "clearmessages",
+	async function(_msg, _limit) {
+		_msg.channel.messages.fetch({limit: parseInt(_limit, 10) || 50}).then((_fetchMsgs) => {
+			const toDelete = _fetchMsgs.filter((message) => !(message.pinned || BOT.fetchCachedChannel(message.id)))
+			_msg.channel.bulkDelete(toDelete, true);
+		}).catch(err => console.error(err));
+		return true;
+	},
+	"Delete the previous [number] of messages sent to this channel\nRequires MANAGE_MESSAGES permission"
+).needPermission = permissions.manageMessages;
+COMMANDS.register("Macros", "log",
+	function(_msg, _key) {
+		if (_key) {
+			console.log((function(_lckey){
+				switch (_lckey[0]) {
+					case "c": return (_lckey[1] === "m") ? _msg.channel.messages : _msg.channel;
+					case "g": return (_lckey[1] === "c") ? _msg.guild.channels : _msg.guild;
+
+					default: return _msg;
+				}
+			})(_key.toLowerCase()));
+		}
+		else if (_msg.reference !== null) {
+			BOT.fetchReference(_msg).then((_ref) => {console.log(_ref);});
+		}
+		else {
+			console.error(`COMMANDS.Macros.log did nothing`);
+		}
+		return true;
+	},
+	"Admin Tool; used for debugging"
+).needPermission = permissions.isBotAdmin;
+COMMANDS.register("Macros", "quit",
+	function(_msg) {
+		for (const [id, holder] of Holder.collection.entries()) {Holder.clean(holder, true);}
+		setTimeout(function() {BOT.destroy();}, 1500);
+		return true;
+	},
+	"Admin Tool; used for updates"
+).needPermission = permissions.isBotAdmin;
 //------------------------------------FLAGS
-COMMANDS.registerCategory("flags");
-COMMANDS.register("flags", "delete",
+COMMANDS.registerCategory("Flags",
+	"Commands which only affect the automated Discord interactions (such as displaying the map or deleting the arena) which occur after an instruction list is parsed"
+);
+
+COMMANDS.register("Flags", "delete",
 	function() {return {force: {delete: true}}},
-	"Delete the message containing this command, unless overridden by an error or later call to COMMANDS.flags.keep"
+	"Delete the message containing this command, unless overridden by an error or later call to COMMANDS.Flags.keep"
 );
-COMMANDS.register("flags", "keep",
+COMMANDS.register("Flags", "keep",
 	function() {return {force: {delete: false}}},
-	"Do not delete the message containing this command, unless overridden by a later call to COMMANDS.flags.delete"
+	"Do not delete the message containing this command, unless overridden by a later call to COMMANDS.Flags.delete"
 );
 
-COMMANDS.register("flags", "display",
+COMMANDS.register("Flags", "display",
 	function() {return {force: {update: true, display: true}}},
-	"Do not display the map of this channel's Arena, unless overridden by a later call to COMMANDS.flags.hidden"
+	"Do not display the map of this channel's Arena, unless overridden by a later call to COMMANDS.Flags.hidden"
 );
-COMMANDS.register("flags", "hidden",
+COMMANDS.register("Flags", "hidden",
 	function() {return {force: {update: false, display: false}}},
-	"Display the map of this channel's Arena, unless overridden by an error or later call to COMMANDS.flags.display"
+	"Display the map of this channel's Arena, unless overridden by an error or later call to COMMANDS.Flags.display"
 );
 
-COMMANDS.register("flags", "clean",
+COMMANDS.register("Flags", "clean",
 	function() {return {force: {timer: 1000}, suggest: {display: false}}},
-	"Trigger the autodeletion of this channel's Arena, unless overridden by an error or later call to COMMANDS.flags.extend"
+	"Trigger the autodeletion of this channel's Arena, unless overridden by an error or later call to COMMANDS.Flags.extend"
 );
-COMMANDS.register("flags", "extend",
+COMMANDS.register("Flags", "extend",
 	function() {return {force: {timer: Holder.defaultTimer}, suggest: {display: false}}},
-	"Reset the autodeletion timer of this channel's Arena, unless overridden by an error or later call to COMMANDS.flags.clean"
+	"Reset the autodeletion timer of this channel's Arena, unless overridden by an error or later call to COMMANDS.Flags.clean"
 );
 //------------------------------------TOOLS
-COMMANDS.register("tools", "explain",
+COMMANDS.registerCategory("Discord",
+	"Commands for which Discord integration is the main purpose"
+);
+
+COMMANDS.register("Discord", "explain",
 	function(_msg, _key) {
 		let toExplain = REG;
 		if (_key) {
 			for (const keyPart of _key.split(".")) {toExplain = toExplain[keyPart];}
 		}
-		toExplain.explainText &&	minorUtils.makeTemp(_msg.channel.send(toExplain.explainText));
+		toExplain.explainText && minorUtils.makeTemp(_msg.channel.send(toExplain.explainText));
 		return {display: false};
 	},
 	"Get helptext and/or a list of subcategories for a given subject.\nNothing to see here you don't already understand :)"
-).requires = ["message"];
+).requires = ["msg"];
 
-COMMANDS.register("tools", "arena",
+COMMANDS.register("Discord", "arena",
 	function(_msg, _arenaType) {
 		const arenaType = _arenaType.toLowerCase();
 		const arenaBuilder = CONSOLES.arena[arenaType];
@@ -199,8 +229,8 @@ COMMANDS.register("tools", "arena",
 		holder.arenaType = arenaType;
 	},
 	"Create a new arena of a given type.\nArgument options:\n> [arena_type (case-sensitive)] {see CONSOLES.arena.[arena_type] for additional arguments}"
-).requires = ["message"];
-COMMANDS.register("tools", "thread",
+).requires = ["msg"];
+COMMANDS.register("Discord", "thread",
 	async function(_msg, _channelId) {
 		const holder = Holder.ensure(_msg.channel);
 
@@ -243,46 +273,9 @@ COMMANDS.register("tools", "thread",
 	+ "\nCreate a new thread and claim it (skipped if there is a current thread):\n> Call 'thread' not in a thread and not as a reply to a message that seeds a thread"
 	+ "\nBump (and unarchive) the current thread:\n> Call 'thread' in the main channel while there is a current thread"
 	+ "\nRevoke current thread:\n> Call 'thread' in the current thread"
-).requires = ["message"];
+).requires = ["msg"];
 
-COMMANDS.register("tools", "showguide",
-	function(_arena) {
-		return {suggest: {display: _arena.showGuide(...sliceArgs(arguments, 1)).hasShape()}};
-	},
-	"Display the previous guide (does not persist across calls to 'arena') on the current map\nArgument options:\n> {additional arguments from CONSOLES.showguide[arena_type]}"
-).requires = ["arena"];
-COMMANDS.register("tools", "addguide",
-	function(_holder, _arena, _guideType) {
-		const guideBuilder = CONSOLES.guide[_guideType.toLowerCase()];
-		if (guideBuilder === undefined) { throw `GuideType, ${_guideType}, is undefined`; }
-
-		_arena.addGuide(...guideBuilder(_arena, ...sliceArgs(arguments, 3)));
-	},
-	"Add a shape to the current guide, and display them all\nArgument options:\n> [shape (see CONSOLES.guide for options)] {additional arguments from CONSOLES.guide.[shape]}"
-).requires = ["holder", "arena"];
-COMMANDS.register("tools", "setguide",
-	function(_holder, _arena, _guideType) {
-		_arena.clearGuide();
-		if (_guideType === undefined) {return {suggest: {display: false}};}
-
-		COMMANDS.tools.addguide(...arguments);
-	},
-	"Remove all shapes to the current guide, then optionally call addguide.\nArgument options:\n> {arguments to pass to addguide} *=> no arguments just clears current guide*"
-).requires = ["holder", "arena"];
-
-COMMANDS.register("tools", "instructions",
-	function(_holder, _arena) {
-		const instructions = _holder.makeInstructionList();
-		if (!instructions) {
-			console.error(`Call to ${holder.arenaType}.makeInstructionList returned false`);
-			return {suggest: {error: true}};
-		}
-		_holder.channel.send(instructions);
-		return {suggest: {display: false, timer: false}};
-	},
-	"Create an instruction list that describes all groups and tokens in the current arena.\nNo arguments\nNotes:\n> Not all arena_types support this command."
-).requires = ["holder", "arena"];
-COMMANDS.register("tools", "resizearena",
+COMMANDS.register("Discord", "resizearena",
 	function(_holder, _arena, _w, _h, _dx, _dy) {
 		if (!_arena.canResize) { throw `Arena Type ${_holder.arenaType} cannot be resized`; }
 		const w = parseInt(_w, 10);
@@ -299,18 +292,70 @@ COMMANDS.register("tools", "resizearena",
 	},
 	"Create and immediately parse an instruction list where the current arena has been expanded and, optionally, all tokens moved by some offset\nArgument options:\n> [new_width] [new_height] {horizontal_offset} {vertical_offset}\nNotes:> Not all arena_types support this command."
 ).requires = ["holder", "arena"];
-//------------------------------------ALIAS
-COMMANDS.addAliases("flags", "display", "map");
-COMMANDS.addAliases("flags", "hidden", "nomap");
-COMMANDS.addAliases("flags", "clean", "finished");
-COMMANDS.addAliases("flags", "extend", "continue");
+COMMANDS.register("Discord", "instructions",
+	function(_holder, _arena) {
+		const instructions = _holder.makeInstructionList();
+		if (!instructions) {
+			console.error(`Call to ${holder.arenaType}.makeInstructionList returned false`);
+			return {suggest: {error: true}};
+		}
+		_holder.channel.send(instructions);
+		return {suggest: {display: false, timer: false}};
+	},
+	"Create an instruction list that describes all groups and tokens in the current arena.\nNo arguments\nNotes:\n> Not all arena_types support this command."
+).requires = ["holder", "arena"];
 
-COMMANDS.addAliases("tools", "explain", "help");
-COMMANDS.addAliases("tools", "arena", "new");
-COMMANDS.addAliases("tools", "resizearena", "expand");
+COMMANDS.register("Discord", "showguide",
+	function(_arena) {
+		return {suggest: {display: _arena.showGuide(...sliceArgs(arguments, 1)).hasShape()}};
+	},
+	"Display the previous guide (does not persist across calls to 'arena') on the current map\nArgument options:\n> {additional arguments from CONSOLES.showguide[arena_type]}"
+).requires = ["arena"];
+COMMANDS.register("Discord", "addguide",
+	function(_arena, _guideType) {
+		const guideBuilder = CONSOLES.guide[_guideType.toLowerCase()];
+		if (guideBuilder === undefined) { throw `GuideType, ${_guideType}, is undefined`; }
+
+		_arena.addGuide(...guideBuilder(_arena, ...sliceArgs(arguments, 2)));
+	},
+	"Add a shape to the current guide, and display them all\nArgument options:\n> [shape (see CONSOLES.guide for options)] {additional arguments from CONSOLES.guide.[shape]}"
+).requires = ["arena"];
+COMMANDS.register("Discord", "setguide",
+	function(_arena, _guideType) {
+		_arena.clearGuide();
+		if (_guideType === undefined) {return {suggest: {display: false}};}
+
+		COMMANDS.Discord.addguide(...arguments);
+	},
+	"Remove all shapes to the current guide, then optionally call addguide.\nArgument options:\n> {arguments to pass to addguide} *=> no arguments just clears current guide*"
+).requires = ["arena"];
+
+COMMANDS.register("Discord", "ping",
+	function(_bot, _msg) {
+		const msgPing = Math.abs(Date.now() - _msg.createdTimestamp);
+		const botPing = Math.abs(_bot.ws.ping);
+
+		minorUtils.makeTemp(_msg.channel.send(
+			`Pong!\n> Total Ping: ${msgPing + botPing}ms\n> From Message: ${msgPing}ms\n> From Bot: ${botPing}ms`
+		));
+		return {suggest: {display: false}};
+	},
+	"Ping the bot.\nNo arguments"
+).requires = ["bot", "msg"];
+//------------------------------------ALIAS
+COMMANDS.addAliases("Flags", "display", "map");
+COMMANDS.addAliases("Flags", "hidden", "nomap");
+COMMANDS.addAliases("Flags", "clean", "finished");
+COMMANDS.addAliases("Flags", "extend", "continue");
+
+COMMANDS.addAliases("Discord", "explain", "help");
+COMMANDS.addAliases("Discord", "arena", "new");
+
+COMMANDS.addAliases("Discord", "resizearena", "expand");
+COMMANDS.addAliases("Discord", "instructions", "collapse");
 //--------------------------------------------------------------------MAIN
 function fetchCommand(_msg, _commandName) {
-	for (const typeName of ["flags", "tools", "core"]) {
+	for (const typeName of ["Flags", "Discord", "core"]) {
 		const out = COMMANDS[typeName][_commandName];
 		if (out !== undefined) {return out;}
 	}
@@ -353,41 +398,18 @@ async function parseInstructionList(_msg, _flags = {}) {
 	return _flags;
 }
 async function parseMessage(_msg) {
-	console.log(`#${_msg.author.discriminator} @${_msg.channel.id}`);
+	const macroStr = _msg.content.split("\n")[0].split(" ");
+	const macro = macroStr[0].startsWith(PREFIX) && (COMMANDS.Macros[macroStr[0].slice(PREFIX.length).toLowerCase()]);
+	const macroFlag = macro && (!macro.needPermission || macro.needPermission(_msg)) && await macro(_msg, macroStr.slice(1));
 
-	let [msg, flags] = await (async function(_line0) {
-		if (_line0.startsWith(PREFIX)) {
-			const macro = _line0.slice(PREFIX.length).split(" ");
-			switch (macro[0]) {
-				case "parse":
-					const ref = await bot.fetchReference(_msg);
-					if (ref) {
-						DiscordCleaner.delete(_msg);
-						return [ref, {delete: ref.author.id === bot.user.id}];
-					}
-					return;
-				case "log":
-					doLog(_msg, macro[1]);
-					break;
-				case "quit":
-					_msg.author.id === process.env.ADMIN_ID && doQuit();
-					break;
-				case "clearmessages":
-					_msg.author.id === process.env.ADMIN_ID && doClearMessages(_msg, parseInt(macro[1]) || undefined);
-					break;
-				case "test":
-					_msg.author.id === process.env.ADMIN_ID && doTest(_msg, ...macro.slice(1));
-					break;
-
-				default: return;
-			}
-			DiscordCleaner.delete(_msg);
-			return [false, false];
-		}
+	if (typeof macroFlag === "boolean") {
+		if (macroFlag) {DiscordCleaner.delete(_msg);}
 		return;
-	})(_msg.content.split("\n")[0].toLowerCase()) || [_msg, {}];
+	}
 
-	msg && (flags = await parseInstructionList(msg, flags));
+	console.log(`#${_msg.author.discriminator} @${_msg.channel.id}`);
+	let [msg, flags] = macroFlag || [_msg, {}];
+	flags = await parseInstructionList(msg, flags);
 
 	if (flags.error) {
 		minorUtils.makeTemp(msg.channel.send("Some Error Message"));
@@ -408,11 +430,11 @@ async function parseMessage(_msg) {
 	}
 }
 
-bot.on("ready", () => {
+BOT.on("ready", () => {
 	if (!CONSOLES.arena) { throw "No arenas have been registered"; }
 
-	console.log(`Logged in as ${bot.user.tag}`);
-	bot.user.setActivity(`for ${PREFIX}explain`, {type: "WATCHING"});
+	console.log(`Logged in as ${BOT.user.tag}`);
+	BOT.user.setActivity(`for ${PREFIX}explain`, {type: "WATCHING"});
 
 	fs.readdir(instructionDir, (dir_e, files) => {
 		if (dir_e) { throw dir_e; }
@@ -423,7 +445,7 @@ bot.on("ready", () => {
 				if (read_e) { throw read_e; }
 
 				try {
-					bot.fetchCachedChannel(fileName.split(".")[0]).send(data.toString()).then((_msg) => {
+					BOT.fetchCachedChannel(fileName.split(".")[0]).send(data.toString()).then((_msg) => {
 						parseMessage(_msg, {delete: true});
 					});
 				} catch (e) {console.error(`Could not find channel ${fileName.split(".")[0]}`);}
@@ -434,10 +456,10 @@ bot.on("ready", () => {
 		}
 	});
 });
-bot.on("messageCreate", (_msg) => {
+BOT.on("messageCreate", (_msg) => {
 	!_msg.author.bot && parseMessage(_msg);
 });
-bot.on("guildDelete", (_guild) => {
+BOT.on("guildDelete", (_guild) => {
 	_guild.channels.fetch().then((_channels) => {
 		for (const [id, textChannel] of _channels.filter((c) => c.type === "GUILD_TEXT").entries()) {
 			const holder = Holder.get(id);
@@ -446,10 +468,10 @@ bot.on("guildDelete", (_guild) => {
 	}).catch(err => console.error(err));
 });
 //--------------------------------------------------------------------FINALIZE
-bot.login(process.env.DEV_TOKEN);
+BOT.login(process.env.DEV_TOKEN);
 
 process.on("SIGINT", () => {
-	doQuit();
+	COMMANDS.Macros.quit();
 });
 
 module.exports = {};

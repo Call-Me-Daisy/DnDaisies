@@ -6,13 +6,26 @@ const {Arena} = require("../arena");
 //--------------------------------------------------------------------PARSERS
 const colourParser = new Parser({
 	COLOURS: {
-		ally: "#38e",
-		enemy: "#e22",
-		ground: "#a38b53",
-		neutral: "#640",
-		object: "#848b94",
-		party: "#2e3",
-		wall: "#000"
+		red: "#f00",
+		green: "#0f0",
+		blue: "#00f",
+		yellow: "#ff0",
+		magenta: "#f0f",
+		cyan: "#0ff",
+		white: "#fff",
+		void: "#000",
+
+		enemy: "#800",
+		party: "#080",
+		ally: "#008",
+		neutral: "#642",
+
+		dirt: "#5e4933",
+		stone: "#7a7671",
+		fire: "#ff7d19",
+		ice: "#9aeddb",
+		lightning: "#b8ac0d",
+		toxic: "#9c37a6"
 	},
 	SHORTCUTS: {},
 	BACKWALK: {},
@@ -24,7 +37,7 @@ const colourParser = new Parser({
 	},
 	forList(_colour) {
 		const team = this.BACKWALK[_colour] || "unafilliated";
-		return `__Team: ${team} (colour: ${_colour})__`;
+		return `__Team/Type: ${team[0].toUpperCase() + team.slice(1)} (colour: ${_colour})__`;
 	},
 
 	fromStr(_colourStr) {
@@ -400,8 +413,8 @@ module.exports = {
 		CONSOLES.register("newGroup", _extensionCode,
 			function(_arena, _name, _colour, _drawStage, _styles, _rangeCSV, _hiddenStr) {
 				const name = _name.toLowerCase();
-				const colour = coreParsers.colourParser.fromStr(_colour);
-				const seeds = _rangeCSV && coreParsers.seedParser.fromCSV(_rangeCSV, _hiddenStr);
+				const colour = colourParser.fromStr(_colour);
+				const seeds = _rangeCSV && seedParser.fromCSV(_rangeCSV, _hiddenStr);
 				const dim = (seeds && seeds[0].dim) || [0, 0, 0];
 
 				let styles = _styles;
@@ -414,7 +427,7 @@ module.exports = {
 					}
 				}
 
-				if (!_arena.makeGroup(name, colour, dim, parseInt(drawStage, 10), styles, seeds)) {
+				if (!_arena.makeGroup(name, colour, dim, parseInt(_drawStage, 10), styles, seeds)) {
 					throw `Group ${_name} already exists`;
 				}
 				return true;
@@ -423,7 +436,7 @@ module.exports = {
 			+ "\n> name => disregards capitalisation"
 			+ "\n> colour => adds shortcuts (see KEYWORDS.colour.shortcuts)"
 			+ "\n> drawStage => rounds down to the nearest integer"
-			+ "\n> styles => takes a CSV of [layer]:[category].[style] (or [category]:[style], which assumes layer = category) and fetches the actual style functions"
+			+ "\n> styles => takes a CSV of [layer]:[category].[style] (or [category]:[style], which assumes [layer] = [category]) and sets the group to draw to [layer] with the [category].[style] function"
 			+ "\n> seeds => assumes tokens are either all visible or all hidden, so user need only input one string alongside a CSV of ranges"
 		);
 		//------------------------------------GUIDES
@@ -463,6 +476,52 @@ module.exports = {
 		);
 		//--------------------------------------------------------------------COMMANDS
 		const COMMANDS = _reg.COMMANDS;
+		//------------------------------------ARENA
+		COMMANDS.register(_extensionCode, "list",
+			function(_holder, _arena, _teamsToList) {
+				const teams = {};
+				for (const [name, group] of _arena.groups) {
+					if (group.styles.name) {
+						(teams[group.colour] || (teams[group.colour] = [colourParser.forList(group.colour)])).push(
+							`Token: ${group.code} => Name: ${name[0].toUpperCase() + name.slice(1)}`
+						);
+					}
+				}
+				if (Object.keys(teams).length < 1) { throw `No teams to list in channel ${_holder.channel.id}`; }
+
+				const msg = [];
+				const teamsToList = {};
+				if (_teamsToList) {
+					for (const team of _teamsToList.split(",")) {teamsToList[team] = true;}
+				}
+				else {teamsToList.all = true;}
+
+				for (const [colour, ls] of Object.entries(teams)) {
+					(teamsToList.all || teamsToList[team]) && msg.push(ls.join("\n"));
+				}
+
+				minorUtils.makeTemp(_holder.channel.send(msg.join("\n\n")));
+				return {suggest: {display: false}};
+			},
+			"Create a temporary instruction list that describes the current arena.\nArgument options:\n> {teamCSV = teams_to_list (defaults to all)}"
+		).requires = ["holder", "arena"];
+		COMMANDS.register(_extensionCode, "distance",
+			function(_arena, _toParse1, _toParse2) {
+				const parsed1 = coordParser.fromUnknown(_arena, _toParse1);
+				const parsed2 = coordParser.fromUnknown(_arena, _toParse2);
+
+				let out = 0;
+				for (let i =0; i< Math.max(parsed1.length, parsed2.length); i++) {
+					out += ((parsed1[i] || 0) - (parsed2[i] || 0))**2;
+				}
+				minorUtils.makeTemp(
+					_holder.channel.send(`Distance( ${_toParse1} <-> ${_toParse2} ) = ${Math.sqrt(out).toFixed(2)} cells`), 0.5
+				);
+
+				return {suggest: {display: false}};
+			},
+			"Measure the distance (in cells) between two points.\nArgument options (each 'coord' can accept one token):\n> [coord = start_point] [coord = end_point]"
+		).requires = ["arena"];
 		//------------------------------------GROUP
 		COMMANDS.register(_extensionCode, "movegroup",
 			function(_arena, _name, _rangeCSV, _hiddenMode) {
@@ -532,73 +591,13 @@ module.exports = {
 			},
 			"Remove and/or return any number of tokens within the same group; removes the group if completely empties.\nArgument options:\n> [group_name]:[indexCSV] {t/f/! => remove/return/flip_whether_removed (defaults to t)}"
 		).requires = ["arena"];
-		//------------------------------------MISC
-		COMMANDS.register(_extensionCode, "distance",
-			function(_holder, _arena, _toParse1, _toParse2) {
-				const parsed1 = coordParser.fromUnknown(_arena, _toParse1);
-				const parsed2 = coordParser.fromUnknown(_arena, _toParse2);
-
-				let out = 0;
-				for (let i =0; i< Math.max(parsed1.length, parsed2.length); i++) {
-					out += ((parsed1[i] || 0) - (parsed2[i] || 0))**2;
-				}
-				minorUtils.makeTemp(
-					_holder.channel.send(`Distance( ${_toParse1} <-> ${_toParse2} ) = ${Math.sqrt(out).toFixed(2)} cells`), 0.5
-				);
-
-				return {suggest: {display: false}};
-			},
-			"Measure the distance (in cells) between two points.\nArgument options (each 'coord' can accept one token):\n> [coord = start_point] [coord = end_point]"
-		).requires = ["holder", "arena"];
-		COMMANDS.register(_extensionCode, "list",
-			function(_holder, _arena, _teamsToList) {
-				const teams = {};
-				for (const [name, group] of _arena.groups) {
-					if (group.styles.name) {
-						(teams[group.colour] || (teams[group.colour] = [colourParser.forList(group.colour)])).push(
-							`Token: ${group.code} => Name: ${name[0].toUpperCase() + name.slice(1)}`
-						);
-					}
-				}
-				if (Object.keys(teams).length < 1) { throw `No teams to list in channel ${_holder.channel.id}`; }
-
-				const msg = [];
-				const teamsToList = {};
-				if (_teamsToList) {
-					for (const team of _teamsToList.split(",")) {teamsToList[team] = true;}
-				}
-				else {teamsToList.all = true;}
-
-				for (const [colour, ls] of Object.entries(teams)) {
-					(teamsToList.all || teamsToList[team]) && msg.push(ls.join("\n"));
-				}
-
-				minorUtils.makeTemp(_holder.channel.send(msg.join("\n\n")));
-				return {suggest: {display: false}};
-			},
-			"Create a temporary instruction list that describes the current arena.\nArgument options:\n> {teamCSV = teams_to_list (defaults to all)}"
-		).requires = ["holder", "arena"];
-		COMMANDS.register(_extensionCode, "ping",
-			function(_bot, _msg) {
-				const msgPing = Math.abs(Date.now() - _msg.createdTimestamp);
-				const botPing = Math.abs(_bot.ws.ping);
-
-				minorUtils.makeTemp(_msg.channel.send(
-					`Pong!\n> Total Ping: ${msgPing + botPing}ms\n> From Message: ${msgPing}ms\n> From Bot: ${botPing}ms`
-				));
-				return {suggest: {display: false}};
-			},
-			"Ping the bot.\nNo arguments"
-		).requires = ["bot", "message"];
 		//------------------------------------ALIAS
+		COMMANDS.addAliases(_extensionCode, "list", "tokens");
+		COMMANDS.addAliases(_extensionCode, "distance", "separation");
 
 		COMMANDS.addAliases(_extensionCode, "hidegroup", "revealgroup");
 
 		COMMANDS.addAliases(_extensionCode, "newtoken", "copy");
 		COMMANDS.addAliases(_extensionCode, "hide", "reveal");
-
-		COMMANDS.addAliases(_extensionCode, "list", "tokens");
-		COMMANDS.addAliases(_extensionCode, "distance", "separation");
-		COMMANDS.addAliases(_extensionCode, "instructions", "collapse");
 	}
 }
