@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.3.0
+### Major changes
+  - Added COMMANDS.dnd.aoecircle and .aoerect to better display variety of 5e's static aoe spells
+### Minor changes
+  - Reordered drawStage for a number of presets
+  - Minor changes to some dnd explain texts
+### Deprecated
+  - COMMANDS.dnd.grid
+### Bugfix
+  - None
+
 ## v2.2.1
 ### Major changes
   - None

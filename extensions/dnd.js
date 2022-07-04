@@ -212,8 +212,8 @@ module.exports = {
 			function(_w, _h) {
 				const w = parseInt(_w, 10);
 				const h = parseInt(_h, 10);
-				const out = new dnd_Arena(w, h);
 
+				const out = new dnd_Arena(w, h);
 				out.makeGroup("background", "#0000", [w - 1, h - 1], 0, {
 					cell: STYLES.cell.rect,
 					token: STYLES.token.image
@@ -221,7 +221,9 @@ module.exports = {
 
 				return out;
 			},
-			"An Arena specialised for 5e D&D.\nAdds...\n> STYLES.token.concentric\n> STYLES.guide: .cone, .sundail, .spider\nLayers:\n> token; draws the main body of the token\n> light; draws the ambient shadows, and any light/shadows emitted by tokens\n> name; draws identifiers to tokens that should be distinguishable\n> guide; draws free-place geometric guides for easier visualisation of movement, spells, etc."
+			"An Arena specialised for 5e D&D."
+			+ "\nAdds...\n> STYLES.token.concentric\n> STYLES.guide: .cone, .sundail, .spider"
+			+ "\nLayers:\n> token; draws the main body of the token\n> light; draws the ambient shadows, and any light/shadows emitted by tokens\n> name; draws identifiers to tokens that should be distinguishable\n> guide; draws free-place geometric guides for easier visualisation of movement, spells, etc."
 		);
 		CONSOLES.register("newGroup", _extensionCode, CONSOLES.newGroup.core);
 		//------------------------------------GUIDES
@@ -309,9 +311,35 @@ module.exports = {
 			"Edit how all tokens in a group affect the shadows in the arena.\nArgument options:\n> [string = name] [number = radius] [0-1 = opacity] {0-1 = proportion of radius that is uniform}\n> [string = name] *=> if group has once affected light, toggle effect on or off*"
 		).requires = ["arena"];
 
+		COMMANDS.register(_extensionCode, "aoecircle",
+			function(_arena, _name, _colour, _rangeCSV) {
+				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 4,
+					{
+						cell: STYLES.cell.ellipse,
+						token: STYLES.token.fill,
+						name: STYLES.name.center
+					},
+					_rangeCSV
+				)
+			},
+			"Tokens designed to represent 5e's circular area of effect spells; for best results use partially tranparent colours.\nDetails:\n> draw_stage = 4\n> styles = cell.ellipse,token.fill,name.center"
+		).requires = ["arena"];
+		COMMANDS.register(_extensionCode, "aoerect",
+			function(_arena, _name, _colour, _rangeCSV) {
+				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 4,
+					{
+						cell: STYLES.cell.rect,
+						token: STYLES.token.grid,
+						name: STYLES.name.center
+					},
+					_rangeCSV
+				)
+			},
+			"Tokens designed to represent 5e's rectangular area of effect spells; for best results use partially tranparent colours.\nDetails:\n> draw_stage = 4\n> styles = cell.rect,token.grid,name.center"
+		).requires = ["arena"];
 		COMMANDS.register(_extensionCode, "army",
 			function(_arena, _name, _colour, _rangeCSV) {
-				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 3,
+				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 2,
 					{
 						cell: STYLES.cell.ellipse,
 						token: STYLES.token.grid,
@@ -320,11 +348,11 @@ module.exports = {
 					_rangeCSV
 				)
 			},
-			"Tokens designed to quickly and easily represent a large group of identical creatures.\nDetails:\n> draw_stage = 3\n> styles = cell.ellipse,token.grid,name.corner"
+			"Tokens designed to quickly and easily represent a large group of identical creatures.\nDetails:\n> draw_stage = 2\n> styles = cell.ellipse,token.grid,name.corner"
 		).requires = ["arena"];
 		COMMANDS.register(_extensionCode, "concentric",
 			function(_arena, _name, _colour, _rangeCSV) {
-				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 4,
+				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 5,
 					{
 						cell: STYLES.cell.ellipse,
 						token: STYLES.token.concentric,
@@ -333,7 +361,7 @@ module.exports = {
 					_rangeCSV
 				)
 			},
-			"Tokens designed to represent 5e's mobile area of effect spells.\nDetails:\n> draw_stage = 4\n> styles = cell.ellipse,token.concentric,name.center"
+			"Tokens designed to represent 5e's mobile area of effect spells.\nDetails:\n> draw_stage = 5\n> styles = cell.ellipse,token.concentric,name.center"
 		).requires = ["arena"];
 		COMMANDS.register(_extensionCode, "creature",
 			function(_arena, _name, _colour, _rangeCSV) {
@@ -348,22 +376,9 @@ module.exports = {
 			},
 			"Tokens designed to represent individual entities capable of independant movement.\nDetails:\n> draw_stage = -1 (always drawn last)\n> styles = cell.ellipse,token.image,name.center"
 		).requires = ["arena"];
-		COMMANDS.register(_extensionCode, "grid",
-			function(_arena, _name, _colour, _rangeCSV) {
-				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 4,
-					{
-						cell: STYLES.cell.rect,
-						token: STYLES.token.grid,
-						name: STYLES.name.center
-					},
-					_rangeCSV
-				)
-			},
-			"Tokens designed to represent 5e's static area of effect spells.\nDetails:\n> draw_stage = 4\n> styles = cell.rect,token.grid,name.center"
-		).requires = ["arena"];
 		COMMANDS.register(_extensionCode, "object",
 			function(_arena, _name, _colour, _rangeCSV) {
-				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 2,
+				CONSOLES.newGroup[_extensionCode](_arena, _name, _colour, 3,
 					{
 						cell: STYLES.cell.rect,
 						token: STYLES.token.image
@@ -371,7 +386,7 @@ module.exports = {
 					_rangeCSV
 				)
 			},
-			"Tokens designed to represent objects which can be interacted with but otherwise have little-to-no agency.\nDetails:\n> draw_stage = 2\n> styles = cell.rect,token.image"
+			"Tokens designed to represent objects which can be interacted with but otherwise have little-to-no agency.\nDetails:\n> draw_stage = 3\n> styles = cell.rect,token.image"
 		).requires = ["arena"];
 		COMMANDS.register(_extensionCode, "static",
 			function(_arena, _name, _colour, _rangeCSV) {
