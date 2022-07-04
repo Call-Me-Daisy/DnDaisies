@@ -1,5 +1,56 @@
 # Changelog
 
+## v2.2.1
+### Major changes
+  - None
+### Minor changes
+  - Various in-code updates to style and tabulation
+  - Slightly increased max font size for better readability on larger maps
+### Deprecated
+  - None
+### Bugfix
+  - Caught multiple BOT typos
+  - Caught _holder typo in COMMANDS.Discord.list
+
+## v2.2.0
+### Major changes
+  - Added explain text for those registered objects left out of 2.1.1
+  - Added Macro category for breaking COMMANDS that must be the first in their command list
+  - Added extensible permissions checking for Macros
+### Minor changes
+  - Various updates and corrections to previous explain texts
+### Deprecated
+  - explain.txt
+### Bugfix
+  - None
+
+## v2.1.1
+### Major changes
+  - Added explain categories (containing lists of objects or sub-categories) for easy navigation
+  - Added explain text for most registered objects
+### Minor changes
+  - Additional colour shortcuts
+  - Altered display order in COMMANDS.tools.list
+  - Updated CONSOLES.guide.cone & .spider to be in-line with v2
+  - Updated COMMANDS.dnd.light to be in-line with new colour shortcuts
+  - Renamed bot to BOT to reflect that it is a global variable
+### Deprecated
+  - None
+### Bugfix
+  - Removed errant 'coreParser's within core.js
+  - Caught _drawStage typo in CONSOLES.core.newGroup
+  - Caught _styles typo in COMMANDS.dnd.custom
+
+## v2.1.0
+### Major changes
+  - Implemented COMMANDS.tools.explain
+### Minor changes
+  - Added first-draft explain texts
+### Deprecated
+  - None
+### Bugfix
+  - None
+
 ## v2.0.0
 ### Major changes
   - Added much-needed error-catching and -prevention methods, so it doesn't crash all the time

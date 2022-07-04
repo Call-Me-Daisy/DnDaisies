@@ -8,7 +8,7 @@ class MapBrush extends Brush {
 		this.pS = _pS;
 		this.pM = _pM || Math.ceil(this.pS/64);
 
-		this.maxFont = Math.floor(2*(this.pS/3 - 2*this.pM));
+		this.maxFont = Math.floor(2*this.pS/3 - 2*this.pM);
 		this.fontStr = _fontStr;
 
 		this.ctx.font = this.maxFont + _fontStr;

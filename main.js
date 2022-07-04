@@ -91,11 +91,15 @@ class Holder {
 	claimThread(_thread, _notify = true) {
 		this.revokeThread();
 		this.thread = _thread;
-		_notify && minorUtils.makeTemp(this.thread.send("TO_DO: NOTIFY CLAIM THREAD"));
+		_notify && minorUtils.makeTemp(
+			this.thread.send("This thread has been claimed by DnDaisies\nTo revoke the thread call 'thread' in this thread")
+		);
 	}
 	revokeThread(_notify = true) {
 		if (!this.thread) {return false;}
-		_notify && minorUtils.makeTemp(this.thread.send("TO_DO: NOTIFY REVOKE THREAD"));
+		_notify && minorUtils.makeTemp(
+			this.thread.send("This thread is no longer claimed by DnDaisies\nTo claim the thread call 'thread [channelID]' or just 'thread' in the thread to claim")
+		);
 		this.thread = false;
 		return true;
 	}
@@ -234,22 +238,24 @@ COMMANDS.register("Discord", "thread",
 	async function(_msg, _channelId) {
 		const holder = Holder.ensure(_msg.channel);
 
-		if (!(holder.thread && (holder.thread = await bot.fetchChannel(holder.thread.id)))) {
+		if (!(holder.thread && (holder.thread = await BOT.fetchChannel(holder.thread.id)))) {
 			let foo;
 			if (_msg.channel instanceof ThreadChannel) {
 				holder.claimThread(_msg.channel);
 			}
-			else if (_channelId && (foo = await bot.fetchChannel(_channelId)) instanceof ThreadChannel) {
+			else if (_channelId && (foo = await BOT.fetchChannel(_channelId)) instanceof ThreadChannel) {
 				holder.claimThread(foo);
 			}
-			else if (_msg.reference !== null && (foo = await bot.fetchReference(_msg))) {
-				holder.claimThread(await bot.fetchChannel(foo.id));
+			else if (_msg.reference !== null && (foo = await BOT.fetchReference(_msg))) {
+				holder.claimThread(await BOT.fetchChannel(foo.id));
 			}
 			else if (foo = await _msg.channel.threads.cache.find(x => x.name = "DnDaisies_Thread")) {
 				holder.claimThread(foo);
 			}
 			else {
-				holder.claimThread(await holder.channel.send("TO_DO: New Thread Prompt").then((_anchor) => {
+				holder.claimThread(await holder.channel.send(
+					"A suitable thread could not be found so a new one will be made."
+				).then((_anchor) => {
 					return _anchor.startThread({name: "DnDaisies_Thread", autoArchiveDuration: 60});
 				}));
 				return {suggest: {display: false}};
@@ -259,7 +265,7 @@ COMMANDS.register("Discord", "thread",
 		}
 		if (_msg.channel.id !== holder.thread.id) {
 			holder.thread.setArchived(false);
-			minorUtils.makeTemp(bot.fetchMessage(holder.channel.id, holder.thread.id).then((_anchor) => {
+			minorUtils.makeTemp(BOT.fetchMessage(holder.channel.id, holder.thread.id).then((_anchor) => {
 				return _anchor && _anchor.reply("bump");
 			}));
 			return {suggest: {display: false}};
@@ -296,7 +302,7 @@ COMMANDS.register("Discord", "instructions",
 	function(_holder, _arena) {
 		const instructions = _holder.makeInstructionList();
 		if (!instructions) {
-			console.error(`Call to ${holder.arenaType}.makeInstructionList returned false`);
+			console.error(`Call to ${_holder.arenaType}.makeInstructionList returned false`);
 			return {suggest: {error: true}};
 		}
 		_holder.channel.send(instructions);

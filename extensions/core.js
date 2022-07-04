@@ -184,7 +184,7 @@ class NameLayer extends StackLayer {
 	constructor(_w, _h, _pS, _layerName = "name") {
 		super(_w, _h, _pS, _layerName);
 
-		this.brush.scaleFont(0.75);
+		this.brush.scaleFont(0.8);
 	}
 
 	async buildArgs(_style, _name, _group, _kwargs) {
@@ -293,31 +293,31 @@ module.exports = {
 
 		STYLES.register("guide", "rect",
 			function(_brush, _args) {
-			_brush.setPos(..._args.origin).adjustForLineWidth();
-			_brush.setDim(...(_args.dim || [_args.pos[0] - _args.origin[0], _args.pos[1] - _args.origin[1]]));
-			_brush.ctx.strokeRect(_brush.x, _brush.y, _brush.w, _brush.h);
-		},
+				_brush.setPos(..._args.origin).adjustForLineWidth();
+				_brush.setDim(...(_args.dim || [_args.pos[0] - _args.origin[0], _args.pos[1] - _args.origin[1]]));
+				_brush.ctx.strokeRect(_brush.x, _brush.y, _brush.w, _brush.h);
+			},
 			"Guide style which outlines an unrotated rectangle"
 		);
 		STYLES.register("guide", "line",
 			function(_brush, _args) {
-			_brush.setPos(_args.origin[0], _args.origin[1]).adjustForLineWidth();
-			_brush.ctx.beginPath();
-			_brush.ctx.moveTo(_brush.x, _brush.y);
-			_brush.setPos(_args.pos[0], _args.pos[1]).adjustForLineWidth();
-			_brush.ctx.lineTo(_brush.x, _brush.y);
-			_brush.ctx.stroke();
-		},
+				_brush.setPos(_args.origin[0], _args.origin[1]).adjustForLineWidth();
+				_brush.ctx.beginPath();
+				_brush.ctx.moveTo(_brush.x, _brush.y);
+				_brush.setPos(_args.pos[0], _args.pos[1]).adjustForLineWidth();
+				_brush.ctx.lineTo(_brush.x, _brush.y);
+				_brush.ctx.stroke();
+			},
 			"Guide style which draws a line connecting any two points"
 		);
 		STYLES.register("guide", "ellipse",
 			function(_brush, _args) {
-			_brush.setPos(_args.origin[0], _args.origin[1]).adjustForLineWidth();
-			_brush.setDim(_args.radii[0], _args.radii[1] || _args.radii[0]);
-			_brush.ctx.beginPath();
-			_brush.ctx.ellipse(_brush.x, _brush.y, _brush.w, _brush.h, 0, 0, Math.PI*2);
-			_brush.ctx.stroke();
-		},
+				_brush.setPos(_args.origin[0], _args.origin[1]).adjustForLineWidth();
+				_brush.setDim(_args.radii[0], _args.radii[1] || _args.radii[0]);
+				_brush.ctx.beginPath();
+				_brush.ctx.ellipse(_brush.x, _brush.y, _brush.w, _brush.h, 0, 0, Math.PI*2);
+				_brush.ctx.stroke();
+			},
 			"Guide style which outlines an unrotated ellipse"
 		);
 
@@ -329,33 +329,33 @@ module.exports = {
 
 		STYLES.register("name", "center",
 			function(_brush, _token, _args) {
-			_brush.setFrom(_token);
-			_brush.write(NameLayer.fullCode(_args));
+				_brush.setFrom(_token);
+				_brush.write(NameLayer.fullCode(_args));
 			},
 			"Name style which draws a high-contrast identifier in the exact center of the token"
 		).invert = true;
 		STYLES.register("name", "corner",
 			function(_brush, _token, _args) {
-			const code = NameLayer.fullCode(_args);
-			_brush.reset();
-			for (const i of [0, 1]) {
-				for (const j of [0, 1]) {
-					_brush.setPos(_token.x + i*(_token.w - 1), _token.y + j*(_token.h - 1));
-					_brush.write(code);
+				const code = NameLayer.fullCode(_args);
+				_brush.reset();
+				for (const i of [0, 1]) {
+					for (const j of [0, 1]) {
+						_brush.setPos(_token.x + i*(_token.w - 1), _token.y + j*(_token.h - 1));
+						_brush.write(code);
+					}
 				}
-			}
 			},
 			"Name style which draws a high-contrast identifier in each corner of the token"
 		).invert = true;
 		STYLES.register("name", "partial",
 			function(_brush, _token, _args) {
-			if (_args.error) {
-				STYLES.name.default(_brush, _token, _args);
-			}
-			else if (_args.many) {
-				_brush.setFrom(_token);
-				_brush.write((_args.i).toString());
-			}
+				if (_args.error) {
+					STYLES.name.default(_brush, _token, _args);
+				}
+				else if (_args.many) {
+					_brush.setFrom(_token);
+					_brush.write((_args.i).toString());
+				}
 			},
 			"Name style which draws only the index in the center of the token; defaults to name.center if token is not an image"
 		).invert = true;
@@ -368,33 +368,33 @@ module.exports = {
 
 		STYLES.register("token", "fill",
 			function(_brush, _token, _args) {
-			_brush.ctx.fillStyle = _args.colour;
-			_args.cell.paint(_brush.setFrom(_token));
-		},
+				_brush.ctx.fillStyle = _args.colour;
+				_args.cell.paint(_brush.setFrom(_token));
+			},
 			"Token style which fills the entire token area with one large cell"
 		);
 		STYLES.register("token", "grid",
 			function(_brush, _token, _args) {
-			_brush.ctx.fillStyle = _args.colour;
-			_brush.setDim(1, 1);
-			for (let y = _token.y; y < _token.y + _token.h; y++) {
-				for (let x = _token.x; x < _token.x + _token.w; x++) {
-					_args.cell.paint(_brush.setPos(x, y));
+				_brush.ctx.fillStyle = _args.colour;
+				_brush.setDim(1, 1);
+				for (let y = _token.y; y < _token.y + _token.h; y++) {
+					for (let x = _token.x; x < _token.x + _token.w; x++) {
+						_args.cell.paint(_brush.setPos(x, y));
+					}
 				}
-			}
-		},
+			},
 			"Token style which fills the entire token area with many 1-1 cells"
 		);
 		STYLES.register("token", "image",
 			async function(_brush, _token, _args) {
-			try {
-				if (_args.error) {throw "";}
-				_brush.setFrom(_token);
-				_brush.draw(await _args.img);
-			} catch {
-				STYLES.token.default(_brush, _token, _args);
-				_args.error = true;
-			}
+				try {
+					if (_args.error) {throw "";}
+					_brush.setFrom(_token);
+					_brush.draw(await _args.img);
+				} catch {
+					STYLES.token.default(_brush, _token, _args);
+					_args.error = true;
+				}
 			},
 			"Token style which fills the entire token area with an image; defaults to token.fill if no image found"
 		).loadsImage = true;
