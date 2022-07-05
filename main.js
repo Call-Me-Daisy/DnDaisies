@@ -3,7 +3,7 @@ require("dotenv").config();
 const fs = require("fs");
 const {Intents, TextChannel, ThreadChannel, MessageAttachment, Permissions} = require("discord.js");
 
-const [{sliceArgs}, {DiscordBot, DiscordCleaner}] = require("cmdaisy-utils").unpack("general", "discord");
+const [{sliceArgs}, {DiscordBot, DiscordCleaner, DiceRoller}] = require("cmdaisy-utils").unpack("general", "discord");
 
 const {minorUtils} = require("./utils");
 const REG = require("./extender");
@@ -103,6 +103,17 @@ class Holder {
 		this.thread = false;
 		return true;
 	}
+	async createNewThread() {
+		this.claimThread(await this.channel.send(
+			"A suitable thread could not be found so a new one will be made."
+		).then((_anchor) => {
+			return _anchor.startThread({name: "DnDaisies_Thread", autoArchiveDuration: 60});
+		}));
+	}
+
+	setCleanTimer(_timer = Holder.defaultTimer) {
+		Holder.setCleanTimer(this, _timer);
+	}
 }
 //--------------------------------------------------------------------COMMANDS
 //------------------------------------COMMANDHELPERS
@@ -117,6 +128,11 @@ const fetchRequirement = {
 	arena: function(_msg) {
 		const out = Holder.fetch(_msg.channel).arena;
 		if (!out) { throw `Required Arena, ${_channel.id}, is undefined`; }
+		return out;
+	},
+	thread: function(_msg) {
+		const out = Holder.fetch(_msg.channel).thread;
+		if (!out) { throw `Required Thread, ${_channel.id}, is undefined`; }
 		return out;
 	}
 };
@@ -253,11 +269,7 @@ COMMANDS.register("Discord", "thread",
 				holder.claimThread(foo);
 			}
 			else {
-				holder.claimThread(await holder.channel.send(
-					"A suitable thread could not be found so a new one will be made."
-				).then((_anchor) => {
-					return _anchor.startThread({name: "DnDaisies_Thread", autoArchiveDuration: 60});
-				}));
+				await holder.createNewThread();
 				return {suggest: {display: false}};
 			}
 			holder.arena && holder.arena.updateGroupLayers();
@@ -348,6 +360,14 @@ COMMANDS.register("Discord", "ping",
 	},
 	"Ping the bot.\nNo arguments"
 ).requires = ["bot", "msg"];
+COMMANDS.register("Discord", "roll",
+	function(_msg, _pools) {
+		minorUtils.makeTemp(_msg.channel.send(DiceRoller.rollStr(_pools).toString()));
+		return {suggest: {display: false}};
+	},
+	"Roll a series of dice pools and add (or subtract) their results together.\nArgument options:\n> [roll_descriptor+/-roll_descriptor+/-...]\n"
+	+ "Each roll descriptor can be one of the following:\n> [X]d[Y] = Roll [X] [Y]-sided dice\n> [X]d[Y]kh[Z] = Roll [X] [Y]-sided dice and keep the highest [Z]\n> [X]d[Y]kl[Z] = Roll [X] [Y]-sided dice and keep the lowest [Z]"
+).requires = ["msg"];
 //------------------------------------ALIAS
 COMMANDS.addAliases("Flags", "display", "map");
 COMMANDS.addAliases("Flags", "hidden", "nomap");
@@ -361,13 +381,15 @@ COMMANDS.addAliases("Discord", "resizearena", "expand");
 COMMANDS.addAliases("Discord", "instructions", "collapse");
 //--------------------------------------------------------------------MAIN
 function fetchCommand(_msg, _commandName) {
-	for (const typeName of ["Flags", "Discord", "core"]) {
-		const out = COMMANDS[typeName][_commandName];
+	const categories = ["Flags", "Discord", "core"];
+
+	const holder = Holder.fetch(_msg.channel);
+	holder && holder.arenaType && categories.splice(2, 0, holder.arenaType);
+
+	for (const category of categories) {
+		const out = COMMANDS[category][_commandName];
 		if (out !== undefined) {return out;}
 	}
-	const holder = Holder.fetch(_msg.channel);
-	const out = ((holder && holder.arenaType && COMMANDS[holder.arenaType]) || {})[_commandName];
-	if (out !== undefined) {return out;}
 
 	throw `Command ${_commandName} not found`;
 }
@@ -397,7 +419,7 @@ async function parseInstructionList(_msg, _flags = {}) {
 						for (const [subKey, subVal] of Object.entries(val)) {_flags[subKey] = subVal;}
 					}
 				}
-			} catch (e) {_flags.error = true; console.error(e);}
+			} catch (e) {_flags.error = command.join(" "); console.error(e);}
 			_flags.didCommand = true;
 		}
 	}

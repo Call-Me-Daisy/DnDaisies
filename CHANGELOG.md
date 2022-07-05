@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.4.0
+### Major changes
+  - Added DiceRoller & COMMANDS.Discord.roll
+### Minor changes
+  - Preparation for more useful error reporting
+  - Preparation for other commands to create threads (using a Holder)
+### Deprecated
+  - None
+### Bugfix
+  - None
+
 ## v2.3.0
 ### Major changes
   - Added COMMANDS.dnd.aoecircle and .aoerect to better display variety of 5e's static aoe spells
