@@ -1,64 +1,54 @@
-const {DiscordCleaner} = require("cmdaisy-utils").discord;
+const fs = require("fs");
+
+const { Console } = require("console");
+//--------------------------------------------------------------------GLOBAL
+const UTILS = module.exports = {};
+
 //--------------------------------------------------------------------MAIN
-//------------------------------------PARSER
-class Parser {
-	static makeTokenTup(_tupStr) {
-		const [name, iCSV] = _tupStr.split(":");
-		let iAry;
-		if (iCSV) {
-			iAry = [];
-			for (const iStr of iCSV.split(",")) {iAry.push(parseInt(iStr, 10));}
+UTILS.addEntries = function(_obj, _entries) {
+	for (const [key, val] of Object.entries(_entries)) {
+		_obj[key] = val;
+	}
+	return _obj;
+}
+
+UTILS.createLoggerFromStreams = function(_logStream, _errStream) {
+	return new Console({
+	  stdout: _logStream,
+	  stderr: _errStream
+	});
+}
+UTILS.createLoggerFromFileNames = function(_logName, _errName) {
+	return UTILS.createLoggerFromStreams(fs.createWriteStream(_logName), fs.createWriteStream(_errName));
+}
+
+UTILS.createLoggerFunctions = function(_logger) {
+	return [
+		(_str) => {
+			console.log(_str);
+			_logger.log(_str);
+		},
+		(_str) => {
+			console.error(_str);
+			_logger.error(_str);
 		}
-		return [name.toLowerCase(), iAry];
-	}
-
-	init() {}
-	constructor(_extraEntries) {
-		for (const [key, val] of Object.entries(_extraEntries)) {this[key] = val;}
-		this.init();
-	}
-
-	fromCSV(_typeCSV) {
-		const out = [];
-		for (const typeStr of _typeCSV.split(",")) {out.push(this.fromStr(typeStr));}
-		return out;
-	}
-	fromTokenTupStr(_arena, _tokenTupStr) {
-		return this.fromToken(_arena.fetchTokens(...Parser.makeTokenTup(_tokenTupStr))[0]);
-	}
-	fromUnknown(_arena, _typeStrOrTokenTupStr) {
-		const fromStr = this.fromStr(_typeStrOrTokenTupStr);
-		return (this.verify(fromStr)) ? fromStr : this.fromTokenTupStr(_arena, _typeStrOrTokenTupStr);
-	}
+	];
 }
-//------------------------------------BOOL_MODES
-const BoolMode = {
-	TRUE() {return true;},
-	FALSE() {return false;},
-	FLIP(_bool) {return !_bool;},
+UTILS.createLoggerFunctionsFromStreams = function(_logStream, _errStream) {
+	return UTILS.createLoggerFunctions(UTILS.createLoggerFromStreams(_logStream, _errStream));
+}
+UTILS.createLoggerFunctionsFromFileNames = function(_logName, _errName) {
+	return UTILS.createLoggerFunctions(UTILS.createLoggerFromFileNames(_logName, _errName));
+}
 
-	SWITCH(_mode, _default = "u") {
-		if (_mode) {
-			switch (_mode[0].toLowerCase()) {
-				case "u": return false;
-				case "t": return this.TRUE;
-				case "f": return this.FALSE;
-				case "!": return this.FLIP;
-			}
-		}
-		return this.SWITCH(_default);
-	}
+UTILS.fetchFromUrl = async function(_url) {
+	const response = await fetch(_url);
+	if (!response.ok) { throw new Error(response.statusText); }
+	return response;
 }
-//--------------------------------------------------------------------HELPERS
-const minorUtils = {
-	STANDARD_DURATION: 1000*5,
-	async makeTemp(_obj, _r = 1) {
-		DiscordCleaner.deleteAfter(await _obj, _r*this.STANDARD_DURATION);
-	}
+UTILS.fetchJSON = async function(_url) {
+	return UTILS.fetchFromUrl(_url).then((response) => { return response.json(); });
 }
-//--------------------------------------------------------------------FINALIZE
-module.exports = {
-	Parser,
-	BoolMode,
-	minorUtils
-};
+UTILS.fetchText = async function(_url) {
+	return UTILS.fetchFromUrl(_url).then((response) => { return response.text(); });
+}

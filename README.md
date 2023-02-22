@@ -1,29 +1,26 @@
-# DnDaisies
+# DnDaisies-v3
 
 ## Overview:
-  - Discord bot which utilises Canvas to make and display interactive maps for tabletop games.
-  - Focused on 5e D&D, but is extensible for any TTG.
-  - Bot functions are command-like, with space-separated arguments and fixed prefix (--).
-  - Contains multiple in-built display styles which can be combined to create a variety of tokens.
+	- Discord bot which utilises Canvas to make and display interactive maps for tabletop games (TTGs).
+	- Designed is centered on D&D 5e, but most functionality is generically useful for any TTG.
+	- Bot functions utilise Discord's slash-command integration
 
-## General Features
-  - Help system to explain each concept, command, and style involved in operating the bot (!DEPRECATED!)
-  - Can parse multiple (newline-separated) commands in one message.
-  - Instances are completely independent across different channels.
-  - Automatically deletes most commands (unless cancelled) and bot messages.
+## General Features:
+	- Can host an arena in each and any channel - instances are completely independant
+	- Can call multiple commands in quick succession by passing an 'instruction list' to /macro parse
+	- Keeps channels clear by both deleting BOT responses and outputting to dedicated thread
 
-## Map Features
-  - Supports other TTGs through an automatic extension system (ie. extensions/dnd.js). 
-  - Multiple interlocking layers, including light mask, high-contrast names, and geometric guide.
-  - Tokens can be colour-coded or display images (contained in dedicated thread to prevent clogging channel proper).
-  - Automatically rebuilds and displays the map (unless cancelled) whenever it changes.
+## Arena Features:
+	- Multiple overlapping layers - including background image
+	- Tokens can be easily colour-coded with any hex-colour (including alpha/opacity)
+	- Automatically rebuilds and displays the map whenever it changes
 
-## Future Features
-  - Track token stats.
-  - Dice rolling widgets.
-  - Ability for DM to prepare hidden content.
-  - Undo command to revert last (major) command.
+## Future Features:
+	- Dice rolling widgets
+	- Undo command to revert previous command
+	- Geometric guides
+	- Light/Visibility display
 
-## Links
-  - GitHub repo: https://github.com/TDCalverley99/DnDaisies
-  - My Discord Server: Under construction.
+## Links:
+	- GitHub repo: https://github.com/TDCalverley99/DnDaisies
+	- Discord support server: Under construction

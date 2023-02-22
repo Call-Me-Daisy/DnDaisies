@@ -1,10 +1,7 @@
-ssh/
-npm*
-node*
-a_*
-
-.env
+node_modules/
 package-lock.json
 
+logs/*
 cache/*
-explain.txt
+
+data/private-config.json

@@ -1,0 +1,13 @@
+{
+	"command_dir": "./commands",
+
+	"thread_name": "DnDaisies_HomeThread",
+	"thread_reason": "A thread for images so they don't pollute the main channel",
+	"thread_anchor": "Don't mind me - just keeping out the way in my thread :innocent:",
+	"thread_claim": "This channel has been claimed for use by the mighty DnDaisies **cackles**",
+
+	"clean_notification": "**This arena has timed out and been deleted**\nIt has been saved in the following message and can be recovered using `/load {message_id}`",
+	"update_notification": "**DnDaisies has gone down for maintenence**\nYour active arena has been saved in the following message and can be recovered using `/load {message_id}`",
+
+	"reply_duration": 5000
+}
