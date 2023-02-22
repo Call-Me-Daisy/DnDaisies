@@ -46,7 +46,7 @@ BOT.utils = {
 		return _msgPromise;
 	},
 	findOldThread: (_interaction) => {
-		return _interaction.member.guild.channels.cache.find(x => x.isThread() && x.name === CONFIG.thread_name);
+		return _interaction.channel.threads.cache.find(x => x.isThread() && x.name === CONFIG.thread_name);
 	},
 	createNewThread: (_interaction) => {
 		return _interaction.member.guild.channels.cache.get(_interaction.channelId).send(CONFIG.thread_anchor)

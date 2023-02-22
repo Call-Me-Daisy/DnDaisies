@@ -1,5 +1,7 @@
 const fs = require("fs");
 
+const { Flags: FLAGS } = require("discord.js").PermissionsBitField;
+
 const CONFIG = require("./config");
 const BOT = require("./bot");
 //--------------------------------------------------------------------GLOBAL
@@ -38,6 +40,13 @@ BOT.on("threadDelete", async (_thread) => {
 
 BOT.on("interactionCreate", async (_interaction) => {
 	if (!_interaction.isChatInputCommand()) { return; }
+	if (!_interaction.channel.permissionsFor(BOT.user).has([FLAGS.ViewChannel, FLAGS.SendMessages])) {
+		_interaction.reply({
+			content: "Computer says no...\nMore specifically: **NO_PERMISSIONS**",
+			ephemeral: true
+		})
+		return;
+	}
 
 	const command = _interaction.client.commands[_interaction.commandName];
 	if (command === undefined) {
