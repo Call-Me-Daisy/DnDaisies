@@ -1,0 +1,24 @@
+//You can start a line with // to make the parser ignore it (useful for notes and comments)
+//Blank lines are also ignored
+
+//Place each command on a new line
+//Specify arguments with the pattern 'name:value' - only include spaces BETWEEN different arguments/command words
+//Note: If you copy-paste a slash command before it's sent, this is actually how it's written
+arena create width:5 height:7
+
+//Commands are executed top-to-bottom
+//Some arguments have choices in Discord, but parse only accepts the actual value (ie. colour)
+group create preset:creature name:Hero colour:00f
+group create preset:creature name:Villain colour:f00
+group create preset:creature name:Mook colour:f00
+group create preset:object name:Sword colour:555
+group create preset:aoe_circle name:Darkness colour:000 width:5 height:5
+
+//Argument names are never case-sensitive
+//Argument values can be case-sensitive, so best practice is to keep your inputs consistent
+//Arguments can contain any character they normally would except spaces
+token create naMe:Hero range:C2
+token create NAmE:Villain ranGe:B3:D5
+group populate name:Mook ranges:B1,C1,D1,B2,D2
+group populate name:Sword ranges:A4,E4 hidden:True
+token create name:Darkness range:C3
