@@ -73,4 +73,8 @@ BOT.on("interactionCreate", async (_interaction) => {
 });
 
 //--------------------------------------------------------------------FINALIZE
+process.on("SIGINT", () => {
+	BOT.commands.dev.execute.quit({});
+});
+
 BOT.login(CONFIG.bot_token);

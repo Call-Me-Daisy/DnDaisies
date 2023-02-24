@@ -79,7 +79,7 @@ module.exports = {
 				CONFIG.dev_mode || arena.homeThread?.send(CONFIG.update_notification);
 				BOT.utils.closeArena({channelId}, !CONFIG.dev_mode);
 			}
-			setTimeout(() => { _interaction.client.destroy(); }, 2000);
+			setTimeout(() => { BOT.destroy(); }, 2000);
 
 			return new BOT.FlagHandler()
 				.setDisplay(false)

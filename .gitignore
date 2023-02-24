@@ -1,8 +1,8 @@
-node_modules/
-ssh/
+ssh/*
+node_modules/*
 package-lock.json
 
-logs/*
-cache/*
+logs/
+cache/
 
 data/private-config.json
