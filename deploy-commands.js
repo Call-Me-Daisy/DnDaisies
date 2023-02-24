@@ -20,11 +20,6 @@ rest.put(
 	{body: []}
 );
 rest.put(
-	Routes.applicationGuildCommands(CONFIG.bot_id, CONFIG.test_area.guild_id),
-	{body: []}
-);
-
-rest.put(
 	Routes.applicationCommands(CONFIG.bot_id),
 	{body: commands}
 );

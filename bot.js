@@ -8,8 +8,7 @@ const { createLoggerFunctionsFromFileNames } = require("./utils");
 //--------------------------------------------------------------------MAIN
 const BOT = module.exports = new Client({intents: [
 	GatewayIntentBits.Guilds,
-	GatewayIntentBits.GuildMessages,
-	GatewayIntentBits.MessageContent
+	GatewayIntentBits.GuildMessages
 ]});
 [BOT.log, BOT.err] = createLoggerFunctionsFromFileNames("logs/log.txt", "logs/err.txt");
 
