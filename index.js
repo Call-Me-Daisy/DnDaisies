@@ -1,6 +1,5 @@
 const fs = require("fs");
 
-
 const { Flags: FLAGS } = require("discord.js").PermissionsBitField;
 
 const CONFIG = require("./config");
