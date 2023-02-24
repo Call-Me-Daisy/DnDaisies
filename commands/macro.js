@@ -64,6 +64,10 @@ module.exports = {
 			)
 		)
 		.addSubcommand(subcommand => subcommand
+			.setName("nukethread")
+			.setDescription("Destroy the HomeThread in the current channel")
+		)
+		.addSubcommand(subcommand => subcommand
 			.setName("parse")
 			.setDescription("Handle a list of commands in one go (advanced)")
 			.addAttachmentOption(option => option
@@ -82,10 +86,6 @@ module.exports = {
 		.addSubcommand(subcommand => subcommand
 			.setName("ping")
 			.setDescription("Replies with Pong!")
-		)
-		.addSubcommand(subcommand => subcommand
-			.setName("nukethread")
-			.setDescription("Destroy the HomeThread in the current channel")
 		)
 		.addSubcommand(subcommand => subcommand
 			.setName("save")
@@ -169,7 +169,17 @@ module.exports = {
 			if (!thread) {
 				throw "UserError: There is no thread to nuke in this channel";
 			}
-			await thread.delete().catch((err) => { throw err });
+			await thread.delete()
+				.then(() => {
+					BOT.channels.fetch(thread.parentId).then((channel) => { channel.messages.delete(thread.id); });
+				})
+				.catch((err) => { throw err })
+			;
+
+			return new BOT.FlagHandler()
+				.setDisplay(false)
+				.setExtend(false)
+			;
 		},
 		parse: async function(_interaction) {
 			const { text_file, message_id, show_example } = BOT.utils.getOptions(_interaction);

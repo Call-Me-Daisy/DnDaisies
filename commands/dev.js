@@ -75,12 +75,11 @@ module.exports = {
 			;
 		},
 		quit: async function(_interaction) {
-			setTimeout(() => { _interaction.client.destroy(); }, 2000);
-
 			for (const [channelId, arena] of Object.entries(BOT.arenas)) {
-				CONFIG.dev_mode || arena.homeThread.send(CONFIG.update_notification);
+				CONFIG.dev_mode || arena.homeThread?.send(CONFIG.update_notification);
 				BOT.utils.closeArena({channelId}, !CONFIG.dev_mode);
 			}
+			setTimeout(() => { _interaction.client.destroy(); }, 2000);
 
 			return new BOT.FlagHandler()
 				.setDisplay(false)
