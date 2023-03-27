@@ -45,10 +45,13 @@ BOT.utils = {
 		return _msgPromise;
 	},
 	findOldThread: (_interaction) => {
-		return _interaction.channel.threads.cache.find(x => x.isThread() && x.name === CONFIG.thread_name);
+		const threads = _interaction.channel.threads;
+		return threads?.cache.find(x => x.name === CONFIG.thread_name) || threads?.fetchArchived().then((archived) => {
+			return archived.threads.find(x => x.name === CONFIG.thread_name);
+		});
 	},
 	createNewThread: (_interaction) => {
-		return _interaction.member.guild.channels.cache.get(_interaction.channelId).send(CONFIG.thread_anchor)
+		return _interaction.channel.send(CONFIG.thread_anchor)
 			.then((anchor) => {
 				return anchor.startThread({
 					name: CONFIG.thread_name,
