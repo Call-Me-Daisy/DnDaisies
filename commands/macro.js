@@ -21,6 +21,7 @@ const parseOption = [
 	(_val) => { return parseFloat(_val); },										//NUMBER
 	(_val) => { throw "NotImplementedError: Parse ATTACHMENT" }				//ATTACHMENT
 ];
+
 //--------------------------------------------------------------------FINALIZE
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -66,6 +67,30 @@ module.exports = {
 		.addSubcommand(subcommand => subcommand
 			.setName("nukethread")
 			.setDescription("Destroy the HomeThread in the current channel")
+		)
+		.addSubcommand(subcommand => subcommand
+			.setName("roll")
+			.setDescription("Roll some virtual dice!")
+			.addIntegerOption(option => option
+				.setName("number")
+				.setDescription("The number of dice to roll; defaults to 1")
+			)
+			.addIntegerOption(option => option
+				.setName("sides")
+				.setDescription("The number of sides on each die; defaults to 20")
+			)
+			.addIntegerOption(option => option
+				.setName("bin_highest")
+				.setDescription("The number of dice (from best->worst) to not include in the result; defaults to 0")
+			)
+			.addIntegerOption(option => option
+				.setName("bin_lowest")
+				.setDescription("The number of dice (from worst->best) to not include in the result; defaults to 0")
+			)
+			.addIntegerOption(option => option
+				.setName("modify")
+				.setDescription("A number to be added to the final total (accepts negatives); defaults to 0")
+			)
 		)
 		.addSubcommand(subcommand => subcommand
 			.setName("parse")
@@ -175,6 +200,52 @@ module.exports = {
 				})
 				.catch((err) => { throw err })
 			;
+
+			return new BOT.FlagHandler()
+				.setDisplay(false)
+				.setExtend(false)
+			;
+		},
+		roll: async function(_interaction) {
+			let {number, sides, bin_highest, bin_lowest, modify} = BOT.utils.getOptions(_interaction);
+			if (number <= 0) { throw `UserError: Number of dice must be positive (requested ${number})`; }
+			if (sides <= 0) { throw `UserError: Number of sides must be positive (requested ${sides})`; }
+
+			number || (number = 1);
+			sides || (sides = 20);
+			bin_highest >= 0 || (bin_highest = 0);
+			bin_lowest >= 0 || (bin_lowest = 0);
+			let total = modify || (modify = 0);
+
+			const rollStr = [
+				`${number}d${sides}`,
+				bin_highest !== 0 && `bh${bin_highest}` || "",
+				bin_lowest !== 0 && `bl${bin_lowest}` || "",
+				modify !== 0 && ((modify > 0) ? "+" : "") + modify || ""
+			].join("");
+
+			if (number <= bin_highest + bin_lowest) { ; }
+			else if (sides === 1) { total += number - bin_highest - bin_lowest; }
+			else {
+				const hist = {};
+				for (let i = 0; i < number; i++) {
+					const r = Math.ceil(sides*Math.random());
+					(hist[r]) ? hist[r]++ : hist[r] = 1;
+				}
+
+				const cumlHist = [];
+				let cumlCount = 0;
+				for (const [val, freq] of Object.entries(hist)) {
+					cumlHist.push({val, start: cumlCount, end: cumlCount += freq});
+				}
+
+				const keep_lowest = number - bin_highest;
+				for (const {val, start, end} of cumlHist.filter(el => el.end > bin_lowest && el.start < keep_lowest )) {
+					total += val*(end - start - Math.max(0, bin_lowest - start) - Math.max(0, end - keep_lowest));
+				}
+			}
+
+			_interaction.editReply(`<@!${_interaction.member.id}> got **${total}**\n(Rolled: ${rollStr})`);
 
 			return new BOT.FlagHandler()
 				.setDisplay(false)
