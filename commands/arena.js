@@ -72,10 +72,8 @@ module.exports = {
 			)
 		)
 	,
-	hasSubcommands: true,
 	execute: {
-		background: async function(_interaction) {
-			const {background, message_id} = BOT.utils.getOptions(_interaction);
+		background: async function(_interaction, {background, message_id}) {
 			const arena = BOT.utils.requireArena(_interaction);
 
 			if (message_id === undefined && background === undefined) {
@@ -98,14 +96,12 @@ module.exports = {
 
 			return;
 		},
-		create: async function(_interaction) {
-			const {width, height, save} = BOT.utils.getOptions(_interaction);
+		create: async function(_interaction, {width, height, save}) {
 			await BOT.utils.setArena(_interaction, createArena(width, height), save !== false);
 
 			return;
 		},
-		destroy: async function(_interaction) {
-			const {save} = BOT.utils.getOptions(_interaction);
+		destroy: async function(_interaction, {save}) {
 			BOT.utils.closeArena(_interaction, save);
 
 			return new BOT.FlagHandler()
@@ -136,8 +132,7 @@ module.exports = {
 				.setExtend(false)
 			;
 		},
-		resize: async function(_interaction) {
-			const {mode, columns, rows} = BOT.utils.getOptions(_interaction);
+		resize: async function(_interaction, {mode, columns, rows}) {
 			const arena = BOT.utils.requireArena(_interaction);
 
 			const [w, h] = (!mode)

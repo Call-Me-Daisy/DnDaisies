@@ -50,7 +50,7 @@ BOT.on("interactionCreate", async (_interaction) => {
 
 	const command = _interaction.client.commands[_interaction.commandName];
 	if (command === undefined) {
-		BOT.err(`Command ${_interaction.commandName} not found`);
+		BOT.err(`CommandError: Command ${_interaction.commandName} not found`);
 		return;
 	}
 
@@ -60,11 +60,11 @@ BOT.on("interactionCreate", async (_interaction) => {
 		command.verifyInteraction?.(_interaction);
 
 		if (command.execute === undefined) {
-			throw `CommandError: Command ${_interaction.commandName} not found`;
+			throw `CommandError: Command ${_interaction.commandName} missing required property, execute`;
 		}
 		const exe = Object.values(_interaction.options).reduce((exe, subKey) => exe[subKey] || exe, command.execute);
 
-		(await exe(_interaction) || new BOT.FlagHandler()).resolve(_interaction);
+		(await exe(_interaction, BOT.utils.getOptions(_interaction)) || new BOT.FlagHandler()).resolve(_interaction);
 	} catch (error) {
 		BOT.err(error);
 		await _interaction.editReply(`Error while executing ${_interaction.commandName} command!\n${error}`);

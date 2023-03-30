@@ -152,10 +152,8 @@ module.exports = {
 			)
 		)
 	,
-	hasSubcommands: true,
 	execute: {
-		create: function(_interaction) {
-			const {colour, colour_hex, name, preset, width, height, depth} = BOT.utils.getOptions(_interaction);
+		create: function(_interaction, {colour, colour_hex, name, preset, width, height, depth}) {
 			const arena = BOT.utils.requireArena(_interaction);
 
 			let fill = (colour.startsWith("-")) ? colour_hex : colour;
@@ -174,8 +172,7 @@ module.exports = {
 				.setDisplay(false)
 			;
 		},
-		destroy: function(_interaction) {
-			const {name} = BOT.utils.getOptions(_interaction);
+		destroy: function(_interaction, {name}) {
 			const groups = BOT.utils.requireArena(_interaction).groups;
 			const group = groups[name.toLowerCase()]
 
@@ -187,8 +184,7 @@ module.exports = {
 				.setDisplay(update)
 			;
 		},
-		hide: function(_interaction) {
-			const {name, mode} = BOT.utils.getOptions(_interaction);
+		hide: function(_interaction, {name, mode}) {
 			for (const token of BOT.utils.requireArena(_interaction).requireGroup(name.toLowerCase()).tokens) {
 				token.hidden = (!mode || mode < 0) ? !token.hidden : !!mode;
 			}
@@ -197,8 +193,7 @@ module.exports = {
 				.setUpdate({group: true})
 			;
 		},
-		move: function(_interaction) {
-			let {name, ranges, skips} = BOT.utils.getOptions(_interaction);
+		move: function(_interaction, {name, ranges, skips}) {
 			const tokens = BOT.utils.requireArena(_interaction).requireGroup(name.toLowerCase()).tokens;
 
 			ranges = rangeParser.parseMany(ranges);
@@ -213,8 +208,7 @@ module.exports = {
 				.setUpdate({group: true})
 			;
 		},
-		populate: function(_interaction) {
-			const {name, ranges, hidden, origin} = BOT.utils.getOptions(_interaction);
+		populate: function(_interaction, {name, ranges, hidden, origin}) {
 			const group = BOT.utils.requireArena(_interaction).requireGroup(name.toLowerCase());
 
 			group.addMany(rangeParser.parseMany(ranges), hidden, origin);
@@ -225,8 +219,7 @@ module.exports = {
 				.setDisplay(update)
 			;
 		},
-		reset: function(_interaction) {
-			const {name, origin} = BOT.utils.getOptions(_interaction);
+		reset: function(_interaction, {name, origin}) {
 			const group = BOT.utils.requireArena(_interaction).requireGroup(name.toLowerCase());
 
 			for (const token of group.tokens) { token.setSpan(...group.span); }
@@ -235,8 +228,7 @@ module.exports = {
 				.setUpdate({group: true})
 			;
 		},
-		resize: function(_interaction) {
-			const {name, width, height, depth, enact} = BOT.utils.getOptions(_interaction);
+		resize: function(_interaction, {name, width, height, depth, enact}) {
 			const group = BOT.utils.requireArena(_interaction).requireGroup(name.toLowerCase());
 
 			for (const [i, n] of Object.entries([width, height, depth])) {

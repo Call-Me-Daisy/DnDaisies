@@ -31,9 +31,8 @@ module.exports = {
 	verifyInteraction: function(_interaction) {
 		if (_interaction.user.id !== CONFIG.dev_id) { throw "PermissionsError: User is not dev"; }
 	},
-	hasSubcommands: true,
 	execute: {
-		test: async function(_interaction) {
+		test: async function(_interaction, _options) {
 			/* SAVE
 			setOptions(_interaction, {width: 15, height: 10});
 			testCommand(_interaction, "arena", "create");
@@ -74,7 +73,7 @@ module.exports = {
 				.setExtend(false)
 			;
 		},
-		quit: async function(_interaction) {
+		quit: async function(_interaction, _options) {
 			const promises = [];
 
 			for (const guild of BOT.guilds.cache.values()) {
