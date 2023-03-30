@@ -137,7 +137,7 @@ module.exports = {
 			;
 		},
 		clearthread: async function(_interaction) {
-			const thread = BOT.utils.requireThread(_interaction);
+			const thread = await BOT.utils.requireThread(_interaction);
 
 			thread.messages.fetch({limit: _interaction.options._hoistedOptions[0]}).then((messages) => {
 				thread.bulkDelete(

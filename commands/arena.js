@@ -86,7 +86,7 @@ module.exports = {
 			const thread = await BOT.utils.ensureHomeThread(_interaction, false);
 			const msg = await ((message_id === undefined)
 				? BOT.utils.formatMessage(thread.send({files: [background]}))
-				:  thread.messages.fetch(message_id)
+				: thread.messages.fetch(message_id)
 			);
 			const {contentType, url} = (message_id === undefined) ? background : msg.attachments.values().next().value;
 
@@ -100,7 +100,7 @@ module.exports = {
 		},
 		create: async function(_interaction) {
 			const {width, height, save} = BOT.utils.getOptions(_interaction);
-			BOT.utils.setArena(_interaction, createArena(width, height), save !== false);
+			await BOT.utils.setArena(_interaction, createArena(width, height), save !== false);
 
 			return;
 		},

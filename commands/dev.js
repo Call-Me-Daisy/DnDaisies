@@ -75,11 +75,16 @@ module.exports = {
 			;
 		},
 		quit: async function(_interaction) {
-			for (const [channelId, arena] of Object.entries(BOT.arenas)) {
-				CONFIG.dev_mode || arena.homeThread?.send(CONFIG.update_notification);
-				BOT.utils.closeArena({channelId}, !CONFIG.dev_mode);
+			const promises = [];
+
+			for (const guild of BOT.guilds.cache.values()) {
+				for (const [channelId, arena] of Object.entries(BOT.arenas)) {
+					const channel = await guild.channels.fetch(channelId);
+					channel !== undefined && promises.push(BOT.utils.closeArena({channel, channelId}, !CONFIG.dev_mode));
+				}
 			}
-			setTimeout(() => { BOT.destroy(); }, 2000);
+
+			Promise.all(promises).then((resolutions) => { setTimeout(() => { BOT.destroy(); }, 2000); });
 
 			return new BOT.FlagHandler()
 				.setDisplay(false)
