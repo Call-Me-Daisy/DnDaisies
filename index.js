@@ -59,12 +59,12 @@ BOT.on("interactionCreate", async (_interaction) => {
 	try {
 		command.verifyInteraction?.(_interaction);
 
-		const execute = (command.hasSubcommands) ? command.execute[_interaction.options._subcommand] : command.execute;
-		if (execute === undefined) {
-			throw `CommandError: Command [${_interaction.commandName}, ${_interaction.options._subcommand}] not found`;
+		if (command.execute === undefined) {
+			throw `CommandError: Command ${_interaction.commandName} not found`;
 		}
+		const exe = Object.values(_interaction.options).reduce((exe, subKey) => exe[subKey] || exe, command.execute);
 
-		(await execute(_interaction) || new BOT.FlagHandler()).resolve(_interaction);
+		(await exe(_interaction) || new BOT.FlagHandler()).resolve(_interaction);
 	} catch (error) {
 		BOT.err(error);
 		await _interaction.editReply(`Error while executing ${_interaction.commandName} command!\n${error}`);
