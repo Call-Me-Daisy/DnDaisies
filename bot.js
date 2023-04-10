@@ -36,7 +36,7 @@ BOT.utils = {
 		return out;
 	},
 
-	formatMessage: (_msgPromise) => {
+	formatMessage: async (_msgPromise) => {
 		_msgPromise.then((msg) => {
 			msg.edit(
 				`**Session Date: ${new Date(Date.now()).toLocaleDateString()}**\n||message_id: ${msg.id}||` + msg.content
@@ -44,13 +44,13 @@ BOT.utils = {
 		});
 		return _msgPromise;
 	},
-	findOldThread: (_interaction) => {
+	findOldThread: async (_interaction) => {
 		const threads = _interaction.channel.threads;
 		return threads?.cache.find(x => x.name === CONFIG.thread_name) || threads?.fetchArchived().then((archived) => {
 			return archived.threads.find(x => x.name === CONFIG.thread_name);
 		});
 	},
-	createNewThread: (_interaction) => {
+	createNewThread: async (_interaction) => {
 		return _interaction.channel.send(CONFIG.thread_anchor)
 			.then((anchor) => {
 				return anchor.startThread({
@@ -68,8 +68,8 @@ BOT.utils = {
 		if (!out) { throw "UserError: There is no arena in the current channel"; }
 		return out;
 	},
-	requireThread: (_interaction) => {
-		const out = BOT.arenas.fetch(_interaction)?.homeThread || BOT.utils.findOldThread(_interaction);
+	requireThread: async (_interaction) => {
+		const out = BOT.arenas.fetch(_interaction)?.homeThread || await BOT.utils.findOldThread(_interaction);
 		if (!out) { throw "UserError: There is no homeThread in the current channel"; }
 		return out;
 	},
@@ -124,7 +124,7 @@ BOT.utils = {
 	},
 
 	//Arena Wrappers
-	saveArena: (_interaction) => {
+	saveArena: async (_interaction) => {
 		const pack = BOT.arenas.fetch(_interaction)?.pack();
 
 		if (pack === undefined) { return BOT.err("Warning: saveArena called on empty channel"); }
@@ -132,22 +132,23 @@ BOT.utils = {
 
 		return BOT.utils.sendAsFile(_interaction, JSON.stringify(pack), "pack.json");
 	},
-	closeArena: (_interaction, _save = true) => {
-		_save && BOT.utils.saveArena(_interaction);
+	closeArena: async (_interaction, _save = true) => {
+		_save && await BOT.utils.saveArena(_interaction);
 		BOT.arenas.delete(_interaction);
 	},
-	setArena: (_interaction, _arena, _save) => {
-		BOT.utils.closeArena(_interaction, _save);
-		BOT.arenas.set(_interaction, _arena).homeThread = BOT.utils.findOldThread(_interaction);
+	setArena: async (_interaction, _arena, _save) => {
+		await BOT.utils.closeArena(_interaction, _save);
+		BOT.arenas.set(_interaction, _arena);
+		return _arena.homeThread = await BOT.utils.findOldThread(_interaction);
 	}
 };
 
 //--------------------------------------------------------------------FLAGHANDLER
 const handlerFunctions = {
-	delete: (_interaction, _arena, _flag) => {
+	delete: async (_interaction, _arena, _flag) => {
 		setTimeout(() => { BOT.utils.deleteReply(_interaction); }, CONFIG.reply_duration);
 	},
-	update: (_interaction, _arena, _flag) => {
+	update: async (_interaction, _arena, _flag) => {
 		if (!_arena) { return; }
 		if (_flag.all) { return _arena.stack.updateAllLayers(); }
 
@@ -155,11 +156,11 @@ const handlerFunctions = {
 		_flag.group && _arena.stack.updateGroupLayers();
 		_flag.multi && _arena.stack.updateMultiLayers();
 	},
-	display: (_interaction, _arena, _flag) => {
+	display: async (_interaction, _arena, _flag) => {
 		if (!_arena) { return; }
 		BOT.utils.displayMap(_interaction);
 	},
-	extend: (_interaction, _arena, _flag) => {
+	extend: async (_interaction, _arena, _flag) => {
 		if (!_arena) { return; }
 		clearTimeout(_arena.timeout);
 		_arena.timeout = setTimeout(() => {
@@ -175,7 +176,7 @@ BOT.FlagHandler = class {
 		this.display = true;
 		this.extend = true;
 	}
-	resolve(_interaction) {
+	async resolve(_interaction) {
 		const arena = BOT.arenas.fetch(_interaction);
 		for (const [key, val] of Object.entries(this)) {
 			val !== false && handlerFunctions[key]?.(_interaction, arena, val);

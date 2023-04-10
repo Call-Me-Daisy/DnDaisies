@@ -105,10 +105,8 @@ module.exports = {
 			)
 		)
 	,
-	hasSubcommands: true,
 	execute: {
-		create: function(_interaction) {
-			const {name, range, hidden, origin} = BOT.utils.getOptions(_interaction);
+		create: function(_interaction, {name, range, hidden, origin}) {
 			const group = BOT.utils.requireArena(_interaction).requireGroup(name.toLowerCase());
 
 			group.add(rangeParser.parse(range), hidden, origin);
@@ -119,8 +117,7 @@ module.exports = {
 				.setDisplay(update)
 			;
 		},
-		hide: function(_interaction) {
-			const {identifier, mode} = BOT.utils.getOptions(_interaction);
+		hide: function(_interaction, {identifier, mode}) {
 			const token = BOT.utils.requireArena(_interaction).requireToken(identifier.toLowerCase());
 
 			token.hidden = (mode === undefined || mode < 0) ? !token.hidden : !!mode;
@@ -129,8 +126,7 @@ module.exports = {
 				.setUpdate({group: true})
 			;
 		},
-		move: function(_interaction) {
-			const {identifier, coord, origin} = BOT.utils.getOptions(_interaction);
+		move: function(_interaction, {identifier, coord, origin}) {
 			const token = BOT.utils.requireArena(_interaction).requireToken(identifier.toLowerCase());
 
 			token.setFrom(rangeParser.parse(coord), origin);
@@ -139,8 +135,7 @@ module.exports = {
 				.setUpdate({group: true})
 			;
 		},
-		remove: function(_interaction) {
-			const {identifier, mode} = BOT.utils.getOptions(_interaction);
+		remove: function(_interaction, {identifier, mode}) {
 			const token = BOT.utils.requireArena(_interaction).requireToken(identifier.toLowerCase());
 
 			token.removed = (mode === undefined || mode < 0) ? !token.removed : !!mode;
@@ -149,8 +144,7 @@ module.exports = {
 				.setUpdate({group: true})
 			;
 		},
-		resize: function(_interaction) {
-			const {identifier, width, height, depth} = BOT.utils.getOptions(_interaction);
+		resize: function(_interaction, {identifier, width, height, depth}) {
 			const token = BOT.utils.requireArena(_interaction).requireToken(identifier.toLowerCase());
 
 			token.setSpan(width, height, depth);

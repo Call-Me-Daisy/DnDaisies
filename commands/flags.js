@@ -29,7 +29,6 @@ module.exports = {
 			)
 		)
 	,
-	hasSubcommands: true,
 	execute: {
 		display: async function(_interaction) {
 			return new BOT.FlagHandler()
@@ -41,9 +40,9 @@ module.exports = {
 				.setDisplay(false)
 			;
 		},
-		update: async function(_interaction) {
+		update: async function(_interaction, {mode}) {
 			const update = {};
-			update[BOT.utils.getOptions(_interaction).mode || "all"] = true;
+			update[mode || "all"] = true;
 
 			return new BOT.FlagHandler()
 				.setUpdate(update)
