@@ -278,7 +278,7 @@ module.exports = {
 					const name = argument.slice(0, index).toLowerCase();
 					options.push({name, value: parseOption[optionTypes[name]](argument.slice(index + 1))});
 				}
-				await command.execute[line[1].toLowerCase()](_interaction);
+				await command.execute[line[1].toLowerCase()](_interaction, BOT.utils.getOptions(_interaction));
 			}
 
 			return new BOT.FlagHandler()
