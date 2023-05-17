@@ -39,13 +39,24 @@ BOT.on("threadDelete", async (_thread) => {
 });
 
 BOT.on("interactionCreate", async (_interaction) => {
-	if (!_interaction.isChatInputCommand()) { return; }
+	if (!_interaction.isChatInputCommand() || _interaction.applicationId !== CONFIG.bot_id) { return; }
 	if (!_interaction.channel.permissionsFor(BOT.user).has([FLAGS.ViewChannel, FLAGS.SendMessages])) {
 		_interaction.reply({
 			content: "Computer says no...\nMore specifically: **NO_PERMISSIONS**",
 			ephemeral: true
-		})
+		});
 		return;
+	}
+	if (_interaction.channel.isThread()) {
+		if (_interaction.channel.ownerId !== CONFIG.bot_id) {
+			_interaction.reply({
+				content: "I don't work properly in threads - try sending that to the parent channel",
+				ephemeral: true
+			});
+			return;
+		}
+		_interaction.channelId = _interaction.channel.parentId;
+		delete _interaction.channel;
 	}
 
 	const command = _interaction.client.commands[_interaction.commandName];
