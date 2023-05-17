@@ -39,7 +39,7 @@ BOT.utils = {
 	formatMessage: async (_msgPromise) => {
 		_msgPromise.then((msg) => {
 			msg.edit(
-				`**Session Date: ${new Date(Date.now()).toLocaleDateString()}**\n||message_id: ${msg.id}||` + msg.content
+				`**Session: ${new Date(Date.now()).toLocaleDateString()}**\n||message_id: ${msg.id}||\n` + msg.content
 			);
 		});
 		return _msgPromise;

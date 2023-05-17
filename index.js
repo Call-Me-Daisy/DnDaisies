@@ -44,7 +44,7 @@ BOT.on("interactionCreate", async (_interaction) => {
 		_interaction.reply({
 			content: "Computer says no...\nMore specifically: **NO_PERMISSIONS**",
 			ephemeral: true
-		})
+		});
 		return;
 	}
 
