@@ -69,6 +69,26 @@ module.exports = {
 			.setDescription("Destroy the HomeThread in the current channel")
 		)
 		.addSubcommand(subcommand => subcommand
+			.setName("parse")
+			.setDescription("Handle a list of commands in one go (advanced)")
+			.addAttachmentOption(option => option
+				.setName("text_file")
+				.setDescription("A file containing the list of commands to execute")
+			)
+			.addStringOption(option => option
+				.setName("message_id")
+				.setDescription("ID of message (in HomeThread) with desired instructions.txt attached")
+			)
+			.addBooleanOption(option => option
+				.setName("show_example")
+				.setDescription("If true, will send an example file that can be parsed to create a simple arena")
+			)
+		)
+		.addSubcommand(subcommand => subcommand
+			.setName("ping")
+			.setDescription("Replies with Pong!")
+		)
+		.addSubcommand(subcommand => subcommand
 			.setName("roll")
 			.setDescription("Roll some virtual dice!")
 			.addIntegerOption(option => option
@@ -91,26 +111,6 @@ module.exports = {
 				.setName("modify")
 				.setDescription("A number to be added to the final total (accepts negatives); defaults to 0")
 			)
-		)
-		.addSubcommand(subcommand => subcommand
-			.setName("parse")
-			.setDescription("Handle a list of commands in one go (advanced)")
-			.addAttachmentOption(option => option
-				.setName("text_file")
-				.setDescription("A file containing the list of commands to execute")
-			)
-			.addStringOption(option => option
-				.setName("message_id")
-				.setDescription("ID of message (in HomeThread) with desired instructions.txt attached")
-			)
-			.addBooleanOption(option => option
-				.setName("show_example")
-				.setDescription("If true, will send an example file that can be parsed to create a simple arena")
-			)
-		)
-		.addSubcommand(subcommand => subcommand
-			.setName("ping")
-			.setDescription("Replies with Pong!")
 		)
 		.addSubcommand(subcommand => subcommand
 			.setName("save")
@@ -204,51 +204,6 @@ module.exports = {
 				.setExtend(false)
 			;
 		},
-		roll: async function(_interaction, {number, sides, bin_highest, bin_lowest, modify}) {
-			if (number <= 0) { throw `UserError: Number of dice must be positive (requested ${number})`; }
-			if (sides <= 0) { throw `UserError: Number of sides must be positive (requested ${sides})`; }
-
-			number || (number = 1);
-			sides || (sides = 20);
-			bin_highest >= 0 || (bin_highest = 0);
-			bin_lowest >= 0 || (bin_lowest = 0);
-			let total = modify || (modify = 0);
-
-			const rollStr = [
-				`${number}d${sides}`,
-				bin_highest !== 0 && `bh${bin_highest}` || "",
-				bin_lowest !== 0 && `bl${bin_lowest}` || "",
-				modify !== 0 && ((modify > 0) ? "+" : "") + modify || ""
-			].join("");
-
-			if (number <= bin_highest + bin_lowest) { ; }
-			else if (sides === 1) { total += number - bin_highest - bin_lowest; }
-			else {
-				const hist = {};
-				for (let i = 0; i < number; i++) {
-					const r = Math.ceil(sides*Math.random());
-					(hist[r]) ? hist[r]++ : hist[r] = 1;
-				}
-
-				const cumlHist = [];
-				let cumlCount = 0;
-				for (const [val, freq] of Object.entries(hist)) {
-					cumlHist.push({val, start: cumlCount, end: cumlCount += freq});
-				}
-
-				const keep_lowest = number - bin_highest;
-				for (const {val, start, end} of cumlHist.filter(el => el.end > bin_lowest && el.start < keep_lowest )) {
-					total += val*(end - start - Math.max(0, bin_lowest - start) - Math.max(0, end - keep_lowest));
-				}
-			}
-
-			_interaction.editReply(`<@!${_interaction.member.id}> got **${total}**\n(Rolled: ${rollStr})`);
-
-			return new BOT.FlagHandler()
-				.setDisplay(false)
-				.setExtend(false)
-			;
-		},
 		parse: async function(_interaction, {text_file, message_id, show_example}) {
 			if (!(text_file || message_id || show_example)) { throw "UserError: Called parse with no arguments"; }
 
@@ -291,6 +246,51 @@ module.exports = {
 		},
 		ping: async function(_interaction) {
 			_interaction.editReply("Pong!");
+
+			return new BOT.FlagHandler()
+				.setDisplay(false)
+				.setExtend(false)
+			;
+		},
+		roll: async function(_interaction, {number, sides, bin_highest, bin_lowest, modify}) {
+			if (number <= 0) { throw `UserError: Number of dice must be positive (requested ${number})`; }
+			if (sides <= 0) { throw `UserError: Number of sides must be positive (requested ${sides})`; }
+
+			number || (number = 1);
+			sides || (sides = 20);
+			bin_highest >= 0 || (bin_highest = 0);
+			bin_lowest >= 0 || (bin_lowest = 0);
+			let total = modify || (modify = 0);
+
+			const rollStr = [
+				`${number}d${sides}`,
+				bin_highest !== 0 && `bh${bin_highest}` || "",
+				bin_lowest !== 0 && `bl${bin_lowest}` || "",
+				modify !== 0 && ((modify > 0) ? "+" : "") + modify || ""
+			].join("");
+
+			if (number <= bin_highest + bin_lowest) { ; }
+			else if (sides === 1) { total += number - bin_highest - bin_lowest; }
+			else {
+				const hist = {};
+				for (let i = 0; i < number; i++) {
+					const r = Math.ceil(sides*Math.random());
+					(hist[r]) ? hist[r]++ : hist[r] = 1;
+				}
+
+				const cumlHist = [];
+				let cumlCount = 0;
+				for (const [val, freq] of Object.entries(hist)) {
+					cumlHist.push({val, start: cumlCount, end: cumlCount += freq});
+				}
+
+				const keep_lowest = number - bin_highest;
+				for (const {val, start, end} of cumlHist.filter(el => el.end > bin_lowest && el.start < keep_lowest )) {
+					total += val*(end - start - Math.max(0, bin_lowest - start) - Math.max(0, end - keep_lowest));
+				}
+			}
+
+			_interaction.editReply(`<@!${_interaction.member.id}> got **${total}**\n(Rolled: ${rollStr})`);
 
 			return new BOT.FlagHandler()
 				.setDisplay(false)
