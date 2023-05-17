@@ -173,7 +173,7 @@ module.exports = {
 				throw `ContentError: Invalid contentType, ${contentType}; only 'application/json' supported`;
 			}
 
-			BOT.utils.setArena(
+			await BOT.utils.setArena(
 				_interaction,
 				Arena.unpack(await fetchJSON(url)),
 				save !== false
