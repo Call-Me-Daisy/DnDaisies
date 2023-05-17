@@ -28,6 +28,9 @@ BOT.utils = {
 	deleteReply: (_interaction) => {
 		_interaction.deleteReply().catch((error) => { BOT.err(`deleteReply failed: ${error}`); });
 	},
+	getChannel: async (_interaction) => {
+		return _interaction.channel || BOT.channels.cache.get(_interaction.channelId);
+	},
 	getOptions: (_interaction) => {
 		const out = {};
 		for (const option of _interaction.options._hoistedOptions) {
@@ -45,13 +48,13 @@ BOT.utils = {
 		return _msgPromise;
 	},
 	findOldThread: async (_interaction) => {
-		const threads = _interaction.channel.threads;
+		const threads = (await BOT.utils.getChannel(_interaction)).threads;
 		return threads?.cache.find(x => x.name === CONFIG.thread_name) || threads?.fetchArchived().then((archived) => {
 			return archived.threads.find(x => x.name === CONFIG.thread_name);
 		});
 	},
 	createNewThread: async (_interaction) => {
-		return _interaction.channel.send(CONFIG.thread_anchor)
+		return (await BOT.utils.getChannel(_interaction)).send(CONFIG.thread_anchor)
 			.then((anchor) => {
 				return anchor.startThread({
 					name: CONFIG.thread_name,

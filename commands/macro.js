@@ -116,6 +116,10 @@ module.exports = {
 			.setName("save")
 			.setDescription("Generate a JSON file to save-state the current arena")
 		)
+		.addSubcommand(subcommand => subcommand
+			.setName("splitscreen")
+			.setDescription("Bump the current HomeThread to access splitscreen mode")
+		)
 	,
 	execute: {
 		clearchannel: async function(_interaction, {thread_id, number}) {
@@ -300,6 +304,19 @@ module.exports = {
 				.setDisplay(false)
 				.setExtend(false)
 			;
+		},
+		splitscreen: async function(_interaction) {
+			const channel = await BOT.utils.getChannel(_interaction);
+			const homeThread = await BOT.utils.findOldThread(_interaction);
+			if (!homeThread) {
+				_interaction.editReply("Couldn't find HomeThread in the current channel");
+			}
+			const anchor = await channel.messages.fetch(homeThread.id);
+			if (!anchor) {
+				_interaction.editReply("You cannot enter splitscreen mode because the thread anchor has been deleted.");
+			}
+
+			anchor.reply("Bump.\nClick the `[x] Messages >` section of *that* message to enter splitscreen mode.");
 		}
 	}
 };
