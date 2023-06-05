@@ -480,7 +480,7 @@ class ImageLayer extends StackLayer {
 			return false;
 		});
 		if (!image) { return; }
-		this.brush.setFrom(this).draw(image);
+		this.brush.draw(image);
 	}
 }
 class GuideLayer extends StackLayer {
