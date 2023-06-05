@@ -12,7 +12,7 @@ module.exports = {
 			.addSubcommand(subcommand => subcommand
 				.setName("box")
 				.setDescription("Create a rectangular guide aligned with the grid")
-				.setStringOption(option => option
+				.addStringOption(option => option
 					.setName("range")
 					.setDescription("Range to highlight")
 					.setRequired(true)
