@@ -1,6 +1,9 @@
 const { SlashCommandBuilder } = require("discord.js");
 
 const BOT = require("../bot");
+const STYLES = require("../styles");
+
+const { rangeParser } = require("../parsers");
 //--------------------------------------------------------------------FINALIZE
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -16,6 +19,10 @@ module.exports = {
 					.setName("range")
 					.setDescription("Range to highlight")
 					.setRequired(true)
+				)
+				.addIntegerOption(option => option
+					.setName("index")
+					.setDescription("Index of the guide to replace; defaults to none - the new guide is simply added")
 				)
 			)
 		)
@@ -50,13 +57,56 @@ module.exports = {
 	,
 	execute: {
 		create: {
-			rect: async function(_interaction) {}
+			box: async function(_interaction, {range, index}) {
+				const guideLayer = BOT.utils.requireGuide(_interaction);
+				const shape = {
+					style: STYLES.guide.rect,
+					kwargs: { rect: rangeParser.parse(range) },
+					description: `box, ${range.split(",")[0]}`
+				};
+
+				(index === undefined) ? guideLayer.shapes.push(shape) : guideLayer.shapes.splice(index, 1, shape);
+
+				return new BOT.FlagHandler()
+					.setUpdate({guide: guideLayer.display})
+					.setDisplay(guideLayer.display)
+				;
+			}
 		},
 		clear: async function(_interaction) {
+			const guideLayer = BOT.utils.requireGuide(_interaction).shapes;
+			const update = guideLayer.shapes.length > 0;
+			guideLayer.shapes = [];
+
+			return new BOT.FlagHandler()
+				.setUpdate({guide: update})
+				.setDisplay(update)
+			;
 		},
 		list: async function(_interaction) {
+			BOT.utils.formatMessage(arena.homeThread.send(
+				BOT.utils.requireGuide(_interaction).shapes.entries().map()
+			))
+			const content = ["Each shape is displayed alongside its __(index)__ for convenience"];
+			for (const [i, shape] of BOT.utils.requireGuide(_interaction).shapes.entries()) {
+				content.push(`__(${i})__\t${shape.description}`);
+			}
+			BOT.utils.formatMessage(arena.homeThread.send(content.join("\n")));
+
+			return new BOT.FlagHandler()
+				.setDisplay(false)
+				.setExtend(false)
+			;
 		},
 		toggle: async function(_interaction) {
+			const guideLayer = BOT.utils.requireGuide(_interaction);
+			guideLayer.display = !guideLayer.display;
+
+			const update = guideLayer.shapes.length > 0;
+			return new BOT.FlagHandler()
+				.setUpdate({guide: update})
+				.setDisplay(update)
+			;
 		}
 	}
 };

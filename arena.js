@@ -341,8 +341,6 @@ class ArenaLayer extends Rect {
 		this.brush = new Brush(this.canvas, _side);
 
 		this.shouldUpdate = true;
-		this.isGroupLayer = false;
-		this.isMultiLayer = false;
 	}
 
 	verifyResize(_w, _h, _side) {
@@ -533,7 +531,7 @@ const ARENA_SPECS = {
 			}
 		},
 		light: {layer: StackLayer, kwargs: {bgColour: "#0002"}},
-		guide: {layer: StackLayer}
+		guide: {layer: GuideLayer}
 	}
 };
 

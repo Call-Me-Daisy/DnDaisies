@@ -72,6 +72,11 @@ BOT.utils = {
 		if (!out) { throw "UserError: There is no arena in the current channel"; }
 		return out;
 	},
+	requireGuide: (_interaction) => {
+		const out = BOT.utils.requireArena(_interaction).stack.layers.guide;
+		if (!out) { throw "UserError: This arena does not have a GuideLayer"; }
+		return out;
+	},
 	requireThread: async (_interaction) => {
 		const out = BOT.arenas.fetch(_interaction)?.homeThread || await BOT.utils.findOldThread(_interaction);
 		if (!out) { throw "UserError: There is no homeThread in the current channel"; }
