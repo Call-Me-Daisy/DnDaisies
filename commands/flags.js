@@ -19,13 +19,12 @@ module.exports = {
 			.setDescription("Display the map after updating all layers of a given type")
 			.addStringOption(option => option
 				.setName("update")
-				.setDescription("Which type of layers to update (defaults to all)")
+				.setDescription("Which type of layers to update; defaults to All")
 				.addChoices(
 					{name: "All", value: "all"},
 					{name: "Background", value: "image"},
 					{name: "Group", value: "group"},
-					{name: "Guide", value: "guide"},
-					{name: "Stack", value: "multi"}
+					{name: "Guide", value: "guide"}
 				)
 			)
 		)

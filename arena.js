@@ -483,6 +483,13 @@ class ImageLayer extends StackLayer {
 		this.brush.setFrom(this).draw(image);
 	}
 }
+class GuideLayer extends StackLayer {
+	constructor(_w, _h, _side, _layerName, _kwargs = {}) {
+		super(...arguments);
+
+		this.shapes = [];
+	}
+}
 class GroupLayer extends StackLayer {
 	async paintGroup(_group, _style, _cell, _kwargs) {
 		for (const [i, token] of _group.tokens.entries()) {
@@ -499,13 +506,6 @@ class GroupLayer extends StackLayer {
 				style && cell && await this.paintGroup(group, style, cell, kwargs);
 			}
 		}
-	}
-}
-class GuideLayer extends StackLayer {
-	constructor(_w, _h, _side, _layerName, _kwargs = {}) {
-		super(...arguments);
-
-		this.shapes = [];
 	}
 }
 
@@ -644,8 +644,13 @@ module.exports = {
 	arenaChoices: buildChoices(ARENA_SPECS),
 	Rect, Cube,
 	ArenaLayer, StackLayer, MultiLayer,
-	GroupLayer, ImageLayer, GuideLayer,
+	ImageLayer, GuideLayer, GroupLayer,
 	Arena,
+	updateHelper: {
+		image: ImageLayer,
+		group: GroupLayer,
+		guide: GuideLayer
+	},
 	createArena: (_w, _h) => {
 		return new Arena(_w, _h);
 	}
