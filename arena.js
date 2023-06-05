@@ -464,6 +464,9 @@ class GroupLayer extends StackLayer {
 		}
 	}
 }
+class GuideLayer extends StackLayer {
+	
+}
 class MultiLayer extends StackLayer {
 	constructor(_w, _h, _side, _layerName, _kwargs = {}) {
 		super(...arguments);
@@ -646,22 +649,18 @@ class Arena extends ArenaLayer {
 }
 
 //--------------------------------------------------------------------FINALIZE
-const originChoices = [];
-for (const name of Object.keys(TOKEN_SPECS)) {
-	originChoices.push({name, value: name});
-}
-const presetChoices = [];
-for (const name of Object.keys(GROUP_SPECS)) {
-	presetChoices.push({name, value: name});
+function buildChoices(_spec) {
+	return Object.keys(_spec).map((name) => { return {name, value: name}; });
 }
 
 module.exports = {
-	originChoices,
-	presetChoices,
+	tokenChoices: buildChoices(TOKEN_SPECS),
+	groupChoices: buildChoices(GROUP_SPECS),
+	arenaChoices: buildChoices(ARENA_SPECS),
 	Rect, Cube,
-	ArenaLayer,
-	StackLayer, GroupLayer,
-	MultiLayer, Arena,
+	ArenaLayer, StackLayer, MultiLayer,
+	GroupLayer, ImageLayer, GuideLayer,
+	Arena,
 	createArena: (_w, _h) => {
 		return new Arena(_w, _h);
 	}
