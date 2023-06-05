@@ -66,6 +66,7 @@ module.exports = {
 				};
 
 				(index === undefined) ? guideLayer.shapes.push(shape) : guideLayer.shapes.splice(index, 1, shape);
+				guideLayer.display === undefined && (guideLayer.display = true);
 
 				return new BOT.FlagHandler()
 					.setUpdate({guide: guideLayer.display})

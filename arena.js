@@ -266,6 +266,11 @@ class Brush extends Rect {
 	pixelSpan(_cellSpan, _margin) {
 		return _cellSpan*this.side - _margin*2;
 	}
+	adjustForLineWidth() {
+		const adjust = Math.ceil(this.ctx.lineWidth/2);
+		this.alterAbs(adjust, adjust, -2*adjust, -2*adjust);
+		return this;
+	}
 
 	setPos(_x, _y, _margin) {
 		const margin = this.getMargin(_margin);
@@ -489,7 +494,7 @@ class GuideLayer extends StackLayer {
 		this.brush.ctx.lineWidth = _side;
 
 		this.shapes = [];
-		this.display = false;
+		this.display = undefined;
 	}
 
 	async paintLayer() {
