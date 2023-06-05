@@ -492,6 +492,7 @@ class GuideLayer extends StackLayer {
 }
 class GroupLayer extends StackLayer {
 	async paintGroup(_group, _style, _cell, _kwargs) {
+		if (!(_style && _cell)) { return; }
 		for (const [i, token] of _group.tokens.entries()) {
 			_kwargs.i = i;
 			!token.removed && !token.hidden && _style(this.brush, _cell, token, _kwargs);
@@ -500,10 +501,8 @@ class GroupLayer extends StackLayer {
 	async paintLayer(_stages) {
 		for (const stage of Object.values(_stages)) {
 			for (const {name, group, kwargs} of stage) {
-				const style = group.styles[this.name]
-				const cell = group.styles.cell;
 				kwargs.single = group.tokens.length <= 1;
-				style && cell && await this.paintGroup(group, style, cell, kwargs);
+				await this.paintGroup(group, group.styles[this.name], group.styles.cell, kwargs);
 			}
 		}
 	}
