@@ -22,8 +22,9 @@ module.exports = {
 				.setDescription("Which type of layers to update (defaults to all)")
 				.addChoices(
 					{name: "All", value: "all"},
-					{name: "Background", value: "background"},
+					{name: "Background", value: "image"},
 					{name: "Group", value: "group"},
+					{name: "Guide", value: "guide"},
 					{name: "Stack", value: "multi"}
 				)
 			)

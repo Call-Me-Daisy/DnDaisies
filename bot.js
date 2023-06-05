@@ -4,6 +4,7 @@ const { Client, GatewayIntentBits } = require("discord.js");
 
 const CONFIG = require("./config");
 
+const { StackLayer, MultiLayer, ImageLayer, GroupLayer, GuideLayer} = require("./arena");
 const { createLoggerFunctionsFromFileNames } = require("./utils");
 //--------------------------------------------------------------------MAIN
 const BOT = module.exports = new Client({intents: [
@@ -148,11 +149,12 @@ const handlerFunctions = {
 	},
 	update: async (_interaction, _arena, _flag) => {
 		if (!_arena) { return; }
-		if (_flag.all) { return _arena.stack.updateAllLayers(); }
+		if (_flag.all) { return _arena.stack.updateLayerType(); }
 
-		_flag.image && _arena.stack.updateImageLayers();
-		_flag.group && _arena.stack.updateGroupLayers();
-		_flag.multi && _arena.stack.updateMultiLayers();
+		_flag.multi && _arena.stack.updateLayerType(MultiLayer);
+		_flag.image && _arena.stack.updateLayerType(ImageLayer);
+		_flag.group && _arena.stack.updateLayerType(GroupLayer);
+		_flag.guide && _arena.stack.updateLayerType(GuideLayer);
 	},
 	display: async (_interaction, _arena, _flag) => {
 		if (!_arena) { return; }

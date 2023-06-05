@@ -380,17 +380,11 @@ class ArenaLayer extends Rect {
 	checkForUpdate() {
 		return this.shouldUpdate;
 	}
-	updateAllLayers() {
-		this.shouldUpdate = true;
+	markForUpdate() {
+		return this.shouldUpdate = true;
 	}
-	updateImageLayers() {
-		this.isImageLayer && (this.shouldUpdate = true);
-	}
-	updateGroupLayers() {
-		this.isGroupLayer && (this.shouldUpdate = true);
-	}
-	updateMultilayers() {
-		this.isMultiLayer && (this.shouldUpdate = true);
+	updateLayerType(_layerType = ArenaLayer) {
+		return this instanceof _layerType && this.markForUpdate();
 	}
 
 	async clearLayer() {
@@ -477,13 +471,7 @@ class MultiLayer extends StackLayer {
 
 		this.layers = {};
 		for (const [name, builder] of Object.entries(_kwargs.builders || {})) {
-			const layer = new builder.layer(this.w, this.h, this.brush.side, name, builder.kwargs);
-
-			layer instanceof ImageLayer && (layer.isImageLayer = true);
-			layer instanceof GroupLayer && (layer.isGroupLayer = true);
-			layer instanceof MultiLayer && (layer.isMultiLayer = true);
-
-			this.layers[name] = layer;
+			this.layers[name] = new builder.layer(this.w, this.h, this.brush.side, name, builder.kwargs);
 		}
 
 		this.targetDrawArea();
@@ -504,17 +492,9 @@ class MultiLayer extends StackLayer {
 		}
 		return false;
 	}
-	updateAllLayers() {
-		for (const layer of Object.values(this.layers)) { layer.updateAllLayers(); }
-	}
-	updateImageLayers() {
-		for (const layer of Object.values(this.layers)) { layer.updateImageLayers(); }
-	}
-	updateGroupLayers() {
-		for (const layer of Object.values(this.layers)) { layer.updateGroupLayers(); }
-	}
-	updateMultiLayers() {
-		for (const layer of Object.values(this.layers)) { layer.updateGroupLayers(); }
+	updateLayerType(_layerType) {
+		for (const layer of Object.values(this.layers)) { layer.updateLayerType(_layerType) && this.markForUpdate(); }
+		return this.shouldUpdate;
 	}
 
 	async clearLayer() {
