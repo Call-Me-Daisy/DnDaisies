@@ -465,7 +465,11 @@ class GroupLayer extends StackLayer {
 	}
 }
 class GuideLayer extends StackLayer {
-	
+	constructor(_w, _h, _side, _layerName, _kwargs = {}) {
+		super(...arguments);
+
+		this.shapes = [];
+	}
 }
 class MultiLayer extends StackLayer {
 	constructor(_w, _h, _side, _layerName, _kwargs = {}) {
