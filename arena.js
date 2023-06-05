@@ -487,7 +487,18 @@ class GuideLayer extends StackLayer {
 	constructor(_w, _h, _side, _layerName, _kwargs = {}) {
 		super(...arguments);
 
+		this.brush.ctx.strokeStyle = _kwargs.stroke || "#3579";
+		this.brush.ctx.lineWidth = _side;
+
 		this.shapes = [];
+		this.display = false;
+	}
+
+	async paintLayer() {
+		if (!this.display) { return; }
+		for (const {style, kwargs} of this.shapes) {
+			style(this.brush, kwargs);
+		}
 	}
 }
 class GroupLayer extends StackLayer {

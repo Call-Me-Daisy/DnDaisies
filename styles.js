@@ -87,6 +87,8 @@ STYLES.light = {
 STYLES.light.default = STYLES.general.null;
 
 STYLES.guide = {
-
+	rect: (_brush, {rect}) => {
+		_brush.setFrom(rect).strokeRect();
+	}
 };
 STYLES.guide.default = STYLES.general.null;
