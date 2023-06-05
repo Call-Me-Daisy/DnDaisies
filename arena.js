@@ -331,6 +331,7 @@ class Brush extends Rect {
 		this.ctx.drawImage(_img, this.x, this.y, this.w, this.h);
 	}
 }
+
 class ArenaLayer extends Rect {
 	constructor(_w, _h, _side, _kwargs = {}) {
 		super(0, 0, _w, _h);
@@ -403,7 +404,6 @@ class ArenaLayer extends Rect {
 		return this.canvas;
 	}
 }
-
 class StackLayer extends ArenaLayer {
 	constructor(_w, _h, _side, _name, _kwargs = {}) {
 		super(_w, _h, _side, _kwargs);
@@ -413,6 +413,49 @@ class StackLayer extends ArenaLayer {
 
 	async paintLayer() {;}
 }
+class MultiLayer extends StackLayer {
+	constructor(_w, _h, _side, _layerName, _kwargs = {}) {
+		super(...arguments);
+
+		this.layers = {};
+		for (const [name, builder] of Object.entries(_kwargs.builders || {})) {
+			this.layers[name] = new builder.layer(this.w, this.h, this.brush.side, name, builder.kwargs);
+		}
+
+		this.targetDrawArea();
+	}
+
+	enactResize(_w, _h, _side) {
+		super.enactResize(_w, _h, _side);
+
+		for (const layer of Object.values(this.layers)) {
+			layer.enactResize(true, this.w, this.h, this.brush.side);
+		}
+	}
+
+	checkForUpdate() {
+		if (super.checkForUpdate()) { return true; }
+		for (const layer of Object.values(this.layers)) {
+			if (layer.checkForUpdate()) { return true;}
+		}
+		return false;
+	}
+	updateLayerType(_layerType) {
+		for (const layer of Object.values(this.layers)) { layer.updateLayerType(_layerType) && this.markForUpdate(); }
+		return this.shouldUpdate;
+	}
+
+	async clearLayer() {
+		this.clearBrushArea();
+	}
+	async paintLayer() {
+		for (const layer of Object.values(this.layers)) {
+			this.brush.ctx.globalCompositeOperation = layer.gco || "source-over";
+			this.brush.draw(await layer.fetchCanvas(...arguments));
+		}
+	}
+}
+
 class ImageLayer extends StackLayer {
 	constructor(_w, _h, _side, _layerName, _kwargs = {}) {
 		super(...arguments);
@@ -463,48 +506,6 @@ class GuideLayer extends StackLayer {
 		super(...arguments);
 
 		this.shapes = [];
-	}
-}
-class MultiLayer extends StackLayer {
-	constructor(_w, _h, _side, _layerName, _kwargs = {}) {
-		super(...arguments);
-
-		this.layers = {};
-		for (const [name, builder] of Object.entries(_kwargs.builders || {})) {
-			this.layers[name] = new builder.layer(this.w, this.h, this.brush.side, name, builder.kwargs);
-		}
-
-		this.targetDrawArea();
-	}
-
-	enactResize(_w, _h, _side) {
-		super.enactResize(_w, _h, _side);
-
-		for (const layer of Object.values(this.layers)) {
-			layer.enactResize(true, this.w, this.h, this.brush.side);
-		}
-	}
-
-	checkForUpdate() {
-		if (super.checkForUpdate()) { return true; }
-		for (const layer of Object.values(this.layers)) {
-			if (layer.checkForUpdate()) { return true;}
-		}
-		return false;
-	}
-	updateLayerType(_layerType) {
-		for (const layer of Object.values(this.layers)) { layer.updateLayerType(_layerType) && this.markForUpdate(); }
-		return this.shouldUpdate;
-	}
-
-	async clearLayer() {
-		this.clearBrushArea();
-	}
-	async paintLayer() {
-		for (const layer of Object.values(this.layers)) {
-			this.brush.ctx.globalCompositeOperation = layer.gco || "source-over";
-			this.brush.draw(await layer.fetchCanvas(...arguments));
-		}
 	}
 }
 
