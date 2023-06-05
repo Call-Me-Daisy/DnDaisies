@@ -105,12 +105,7 @@ BOT.utils = {
 
 	sendAsFile: async (_interaction, _dataString, _fileName) => {
 		const path = `./cache/${_interaction.channelId}_${_fileName}`;
-		await fs.writeFile(path, _dataString, "utf8", (err) => {
-			if (err) {
-				BOT.log(`${path} could not be saved`);
-				throw err;
-			}
-		});
+		fs.writeFileSync(path, _dataString, "utf8");
 		return BOT.utils.attachHomeThread(_interaction, path, _fileName)
 			.then((msg) => {
 				fs.unlink(path, (err) => { err && BOT.err(err); });
