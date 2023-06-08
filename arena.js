@@ -29,8 +29,8 @@ class Rect {
 	alterAbs(_dx, _dy, _dw, _dh) {
 		Number.isFinite(_dx) && (this.x += _dx);
 		Number.isFinite(_dy) && (this.y += _dy);
-		Number.isFinite(_dw) && _dw >= -this.w && (this.w += _dw);
-		Number.isFinite(_dh) && _dh >= -this.h && (this.h += _dh);
+		Number.isFinite(_dw) && ((_dw >= -this.w) ? this.w += _dw : this.w = 1);
+		Number.isFinite(_dh) && ((_dh >= -this.h) ? this.h += _dh : this.h = 1);
 		return this;
 	}
 
@@ -94,9 +94,9 @@ class Cube {
 		Number.isFinite(_dx) && (this.x += _dx);
 		Number.isFinite(_dy) && (this.y += _dy);
 		Number.isFinite(_dz) && (this.z += _dz);
-		Number.isFinite(_dw) && _dw >= -this.w && (this.w += _dw);
-		Number.isFinite(_dh) && _dh >= -this.h && (this.h += _dh);
-		Number.isFinite(_dd) && _dd >= -this.d && (this.d += _dd);
+		Number.isFinite(_dw) && ((_dw >= -this.w) ? this.w += _dw : this.w = 1);
+		Number.isFinite(_dh) && ((_dh >= -this.h) ? this.h += _dh : this.h = 1);
+		Number.isFinite(_dd) && ((_dd >= -this.d) ? this.d += _dd : this.d = 1);
 		return this;
 	}
 
@@ -268,7 +268,7 @@ class Brush extends Rect {
 	}
 	adjustForLineWidth() {
 		const adjust = Math.ceil(this.ctx.lineWidth/2);
-		this.alterAbs(adjust, adjust, -2*adjust, -2*adjust);
+		this.alterAbs(adjust - 1, adjust - 1, 2 - 2*adjust, 2 - 2*adjust);
 		return this;
 	}
 
@@ -491,7 +491,7 @@ class GuideLayer extends StackLayer {
 		super(...arguments);
 
 		this.brush.ctx.strokeStyle = _kwargs.stroke || "#3579";
-		this.brush.ctx.lineWidth = _side;
+		this.brush.ctx.lineWidth = Math.floor(this.brush.pixelSpan(1, 1)/2);
 
 		this.shapes = [];
 		this.display = undefined;
