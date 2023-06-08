@@ -3,27 +3,30 @@ const { SlashCommandBuilder } = require("discord.js");
 const BOT = require("../bot");
 const STYLES = require("../styles");
 
+const { Rect } = require("../arena");
 const { rangeParser } = require("../parsers");
 //--------------------------------------------------------------------FINALIZE
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName("guide")
 		.setDescription("Collection of commands to manage any/all temporary 'guide' shapes on the map")
-		.addSubcommandGroup(group => group
+		.addSubcommand(subcommand => subcommand
 			.setName("create")
 			.setDescription("Collection of commands to add a new guide to the map (optionally replacing one)")
-			.addSubcommand(subcommand => subcommand
-				.setName("box")
-				.setDescription("Create a rectangular guide aligned with the grid")
-				.addStringOption(option => option
-					.setName("range")
-					.setDescription("Range to highlight")
-					.setRequired(true)
-				)
-				.addIntegerOption(option => option
-					.setName("index")
-					.setDescription("Index of the guide to replace; defaults to none - the new guide is simply added")
-				)
+			.addStringOption(option => option
+				.setName("preset")
+				.setDescription("A quick-use template to use for the guide")
+				.addChoices({name: "box", value: "box"})
+				.setRequired(true)
+			)
+			.addStringOption(option => option
+				.setName("range")
+				.setDescription("Range to highlight")
+				.setRequired(true)
+			)
+			.addIntegerOption(option => option
+				.setName("index")
+				.setDescription("Index of the guide to replace; defaults to none - the new guide is simply added")
 			)
 		)
 		.addSubcommand(subcommand => subcommand
@@ -56,23 +59,26 @@ module.exports = {
 		)
 	,
 	execute: {
-		create: {
-			box: async function(_interaction, {range, index}) {
-				const guideLayer = BOT.utils.requireGuide(_interaction);
-				const shape = {
-					style: STYLES.guide.rect,
-					kwargs: { rect: rangeParser.parse(range) },
-					description: `box, ${range.split(",")[0]}`
-				};
+		create: async function(_interaction, {preset, range, index}) {
+			const guideLayer = BOT.utils.requireGuide(_interaction);
 
-				(index === undefined) ? guideLayer.shapes.push(shape) : guideLayer.shapes.splice(index, 1, shape);
-				guideLayer.display === undefined && (guideLayer.display = true);
+			const shape = ((_range) => {
+				switch (preset) {
+					case "box": return {
+						style: STYLES.guide.rect,
+						description: `box, ${_range}`,
+						kwargs: { rect: new Rect().setFrom(rangeParser.parse(_range)) }
+					};
+				}
+			})(range.split(",")[0]);
 
-				return new BOT.FlagHandler()
-					.setUpdate({guide: guideLayer.display})
-					.setDisplay(guideLayer.display)
-				;
-			}
+			(index === undefined) ? guideLayer.shapes.push(shape) : guideLayer.shapes.splice(index, 1, shape);
+			guideLayer.display === undefined && (guideLayer.display = true);
+
+			return new BOT.FlagHandler()
+				.setUpdate({guide: guideLayer.display})
+				.setDisplay(guideLayer.display)
+			;
 		},
 		clear: async function(_interaction) {
 			const guideLayer = BOT.utils.requireGuide(_interaction).shapes;
