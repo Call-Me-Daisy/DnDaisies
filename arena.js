@@ -67,7 +67,7 @@ class Rect {
 		return this.setAbs(this.x + (this.w - _w)/2, this.y + (this.h - _h)/2, _w, _h);
 	}
 	getCenter() {
-		return {x: this.x + this.w/2, y: this.y + this.h/2};
+		return {x: Math.floor(this.x + this.w/2), y: Math.floor(this.y + this.h/2)};
 	}
 }
 class Cube {
@@ -133,7 +133,7 @@ class Cube {
 		return this.setAbs(this.x + (this.w - _w)/2, this.y + (this.h - _h)/2, this.z + (this.d - _d)/2, _w, _h, _d);
 	}
 	getCenter() {
-		return {x: this.x + this.w/2, y: this.y + this.h/2, z: this.z + this.d/2};
+		return {x: this.x + Math.floor(this.w/2), y: this.y + Math.floor(this.h/2), z: this.z + Math.floor(this.d/2)};
 	}
 }
 
