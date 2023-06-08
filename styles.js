@@ -101,26 +101,26 @@ STYLES.guide = {
 		_brush.ctx.stroke();
 	},
 	cone: (_brush, {rect, theta}) => {
-		const [sin, cos] = [Math.sin(theta), Math.cos(theta)];
-		const {x, y} = _brush.setFrom(rect, 0).alterPos(1.1*sin, -1.1*cos).getCenter();
-		const [x1, y1] = [x + sin*_brush.w, y - cos*_brush.w];
-		const dr = {x: cos/2*_brush.h, y: sin/2*_brush.h};
+		const [sin, cos] = [Math.sin(theta), Math.cos(theta)].map(x => Math.floor(x*1e6)/1e6);
+		const {x, y, w, h} = _brush.setFrom(rect, 0).alter(0.5 + sin, 0.5 - cos, 0, -.25);
+		const [x1, y1] = [x + sin*w, y - cos*w];
+		const [dx, dy] = [cos/2*h, sin/2*h];
 
 		_brush.ctx.beginPath();
 		_brush.ctx.moveTo(x, y);
-		_brush.ctx.lineTo(x1 - dr1.x, y1 - dr1.y);
-		_brush.ctx.lineTo(x1 + dr1.x, y1 + dr1.y);
+		_brush.ctx.lineTo(x1 - dx, y1 - dy);
+		_brush.ctx.lineTo(x1 + dx, y1 + dy);
 		_brush.ctx.closePath();
 		_brush.ctx.stroke();
+	},
+	sundail: (_brush, {rect, r1, r2}) => {
+		STYLES.guide.ellipse(_brush, {rect});
+		STYLES.guide.line(_brush, {r1, r2});
 	},
 	spider: (_brush, {r1, rs}) => {
 		for (const r2 of rs) {
 			STYLES.guide.line(_brush, {r1, r2});
 		}
-	},
-	sundail: (_brush, {rect, r2}) => {
-		STYLES.guide.ellipse(_brush, {rect});
-		STYLES.guide.line(_brush, {r1: rect.getCenter(), r2});
 	}
 };
 STYLES.guide.default = STYLES.general.null;

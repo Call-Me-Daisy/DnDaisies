@@ -3,7 +3,7 @@ const { createCanvas, loadImage } = require("canvas");
 const BOT = require("./bot");
 const STYLES = require("./styles");
 
-const { fetchFromUrl } = require("./utils");
+const { fetchFromUrl, buildChoices } = require("./utils");
 //--------------------------------------------------------------------GLOBAL
 const DEFAULT_WIDTH = 1920, DEFAULT_HEIGHT = 1080;
 const DEFAULT_FONT = "px Arial";
@@ -68,6 +68,10 @@ class Rect {
 	}
 	getCenter() {
 		return {x: Math.floor(this.x + this.w/2), y: Math.floor(this.y + this.h/2)};
+	}
+	collapse() {
+		const {x, y, w, h} = this;
+		return {x, y, w, h};
 	}
 }
 class Cube {
@@ -134,6 +138,10 @@ class Cube {
 	}
 	getCenter() {
 		return {x: this.x + Math.floor(this.w/2), y: this.y + Math.floor(this.h/2), z: this.z + Math.floor(this.d/2)};
+	}
+	collapse() {
+		const {x, y, z, w, h, d} = this;
+		return {x, y, z, w, h, d};
 	}
 }
 
@@ -244,7 +252,7 @@ class Brush extends Rect {
 		this.ctx = _canvas.getContext("2d");
 		this.ctx.textAlign = "center";
 		this.ctx.textBaseline = "middle";
-		this.scaleFont(0.75);
+		this.scaleFont(0.6);
 	}
 	scaleFont(_r = 1) {
 		if (_r <= 0 || _r > 1) { throw `Invalid scale for brush.font, ${_r}; requires: 0 < scale <= 1`; }
@@ -491,7 +499,7 @@ class GuideLayer extends StackLayer {
 		super(...arguments);
 
 		this.brush.ctx.strokeStyle = _kwargs.stroke || "#3579";
-		this.brush.ctx.lineWidth = Math.floor(this.brush.pixelSpan(1, 1)/2);
+		this.brush.ctx.lineWidth = Math.floor(this.brush.pixelSpan(0.8, 1));
 
 		this.shapes = [];
 		this.display = undefined;
@@ -555,6 +563,7 @@ class Arena extends ArenaLayer {
 		super(_w + 2, _h + 2, Arena.calculateSide(_w, _h), {bgColour: "#000"});
 		this.set(1, 1, _w, _h);
 		this.defaultAxes = _axesColour;
+		this.brush.scaleFont(0.8);
 		this.paintAxes();
 
 		this.lastStage = 0;
@@ -647,10 +656,6 @@ class Arena extends ArenaLayer {
 }
 
 //--------------------------------------------------------------------FINALIZE
-function buildChoices(_spec) {
-	return Object.keys(_spec).map((name) => { return {name, value: name}; });
-}
-
 module.exports = {
 	tokenChoices: buildChoices(TOKEN_SPECS),
 	groupChoices: buildChoices(GROUP_SPECS),
