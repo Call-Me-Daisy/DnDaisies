@@ -103,7 +103,7 @@ module.exports = {
 		.setDescription("Collection of commands to manage any/all temporary 'guide' shapes on the map")
 		.addSubcommandGroup(group => group
 			.setName("create")
-			.setDescription("Collection of commands to add a new guide to the map")
+			.setDescription("Collection of commands to add a new guide to the map, or overwrite an old one")
 			.addSubcommand(subcommand => subcommand
 				.setName("box")
 				.setDescription("Highlight the outline of a rectangle, aligned with the grid")
@@ -122,6 +122,10 @@ module.exports = {
 				.addNumberOption(option => option
 					.setName("height")
 					.setDescription("The vertical sidelength of the rectangle; defaults to same as width")
+				)
+				.addIntegerOption(option => option
+					.setName("index")
+					.setDescription("Overwrite the with specified index (specify most recent with -1)")
 				)
 			)
 			.addSubcommand(subcommand => subcommand
@@ -143,6 +147,10 @@ module.exports = {
 					.setName("height")
 					.setDescription("The vertical diameter of the ellipse; defaults to same as width")
 				)
+				.addIntegerOption(option => option
+					.setName("index")
+					.setDescription("Overwrite the with specified index (specify most recent with -1)")
+				)
 			)
 			.addSubcommand(subcommand => subcommand
 				.setName("line")
@@ -156,6 +164,10 @@ module.exports = {
 					.setName("endpoint")
 					.setDescription("The coord in which the line ends")
 					.setRequired(true)
+				)
+				.addIntegerOption(option => option
+					.setName("index")
+					.setDescription("Overwrite the with specified index (specify most recent with -1)")
 				)
 			)
 			.addSubcommand(subcommand => subcommand
@@ -179,6 +191,10 @@ module.exports = {
 					.setName("theta")
 					.setDescription("The rotation of the triangle, in degrees from straight up; defaults to 0")
 				)
+				.addIntegerOption(option => option
+					.setName("index")
+					.setDescription("Overwrite the with specified index (specify most recent with -1)")
+				)
 			)
 			.addSubcommand(subcommand => subcommand
 				.setName("sundail")
@@ -196,6 +212,10 @@ module.exports = {
 					.setName("endpoint")
 					.setDescription("The coord on the edge of the circle where the radial line connects")
 				)
+				.addIntegerOption(option => option
+					.setName("index")
+					.setDescription("Overwrite the with specified index (specify most recent with -1)")
+				)
 			)
 			.addSubcommand(subcommand => subcommand
 				.setName("spider")
@@ -209,6 +229,10 @@ module.exports = {
 					.setName("endpoint")
 					.setDescription("The coord(s) in which the line(s) end")
 					.setRequired(true)
+				)
+				.addIntegerOption(option => option
+					.setName("index")
+					.setDescription("Overwrite the with specified index (specify most recent with -1)")
 				)
 			)
 		)
@@ -227,14 +251,6 @@ module.exports = {
 		.addSubcommand(subcommand => subcommand
 			.setName("list")
 			.setDescription("List all guides on the current map, with their indeces")
-		)
-		.addSubcommand(subcommand => subcommand
-			.setName("remove")
-			.setDescription("Remove a shape from the map")
-			.addIntegerOption(option => option
-				.setName("index")
-				.setDescription("Index of the guide to remove from the map - these can be found with /guide list")
-			)
 		)
 		.addSubcommand(subcommand => subcommand
 			.setName("toggle")
