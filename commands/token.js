@@ -3,7 +3,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const BOT = require("../bot");
 
 const { rangeParser } = require("../parsers");
-const { originChoices } = require("../arena");
+const { tokenChoices } = require("../arena");
 //--------------------------------------------------------------------FINALIZE
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -29,7 +29,7 @@ module.exports = {
 			.addStringOption(option => option
 				.setName("origin")
 				.setDescription("The point in the token which will be placed at the coord; defaults to center")
-				.addChoices(...originChoices)
+				.addChoices(...tokenChoices)
 			)
 		)
 		.addSubcommand(subcommand => subcommand
@@ -66,7 +66,7 @@ module.exports = {
 			.addStringOption(option => option
 				.setName("origin")
 				.setDescription("The point in the token which will be placed at the coord; defaults to center")
-				.addChoices(...originChoices)
+				.addChoices(...tokenChoices)
 			)
 		)
 		.addSubcommand(subcommand => subcommand

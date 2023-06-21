@@ -4,6 +4,7 @@ const { Client, GatewayIntentBits } = require("discord.js");
 
 const CONFIG = require("./config");
 
+const { updateHelper } = require("./arena");
 const { createLoggerFunctionsFromFileNames } = require("./utils");
 //--------------------------------------------------------------------MAIN
 const BOT = module.exports = new Client({intents: [
@@ -69,6 +70,11 @@ BOT.utils = {
 	requireArena: (_interaction) => {
 		const out = BOT.arenas.fetch(_interaction);
 		if (!out) { throw "UserError: There is no arena in the current channel"; }
+		return out;
+	},
+	requireGuide: (_interaction) => {
+		const out = BOT.utils.requireArena(_interaction).stack.layers.guide;
+		if (!out) { throw "UserError: This arena does not have a GuideLayer"; }
 		return out;
 	},
 	requireThread: async (_interaction) => {
@@ -148,11 +154,8 @@ const handlerFunctions = {
 	},
 	update: async (_interaction, _arena, _flag) => {
 		if (!_arena) { return; }
-		if (_flag.all) { return _arena.stack.updateAllLayers(); }
-
-		_flag.image && _arena.stack.updateImageLayers();
-		_flag.group && _arena.stack.updateGroupLayers();
-		_flag.multi && _arena.stack.updateMultiLayers();
+		if (_flag.all) { return _arena.stack.updateLayerType(); }
+		for (const [key, val] of Object.entries(_flag)) { val && _arena.stack.updateLayerType(updateHelper[key]); }
 	},
 	display: async (_interaction, _arena, _flag) => {
 		if (!_arena) { return; }

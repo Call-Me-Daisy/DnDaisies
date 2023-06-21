@@ -3,7 +3,7 @@ const { createCanvas, loadImage } = require("canvas");
 const BOT = require("./bot");
 const STYLES = require("./styles");
 
-const { fetchFromUrl } = require("./utils");
+const { fetchFromUrl, buildChoices } = require("./utils");
 //--------------------------------------------------------------------GLOBAL
 const DEFAULT_WIDTH = 1920, DEFAULT_HEIGHT = 1080;
 const DEFAULT_FONT = "px Arial";
@@ -29,8 +29,8 @@ class Rect {
 	alterAbs(_dx, _dy, _dw, _dh) {
 		Number.isFinite(_dx) && (this.x += _dx);
 		Number.isFinite(_dy) && (this.y += _dy);
-		Number.isFinite(_dw) && _dw >= -this.w && (this.w += _dw);
-		Number.isFinite(_dh) && _dh >= -this.h && (this.h += _dh);
+		Number.isFinite(_dw) && ((_dw >= -this.w) ? this.w += _dw : this.w = 1);
+		Number.isFinite(_dh) && ((_dh >= -this.h) ? this.h += _dh : this.h = 1);
 		return this;
 	}
 
@@ -67,7 +67,11 @@ class Rect {
 		return this.setAbs(this.x + (this.w - _w)/2, this.y + (this.h - _h)/2, _w, _h);
 	}
 	getCenter() {
-		return {x: this.x + this.w/2, y: this.y + this.h/2};
+		return {x: Math.floor(this.x + this.w/2), y: Math.floor(this.y + this.h/2)};
+	}
+	collapse() {
+		const {x, y, w, h} = this;
+		return {x, y, w, h};
 	}
 }
 class Cube {
@@ -94,9 +98,9 @@ class Cube {
 		Number.isFinite(_dx) && (this.x += _dx);
 		Number.isFinite(_dy) && (this.y += _dy);
 		Number.isFinite(_dz) && (this.z += _dz);
-		Number.isFinite(_dw) && _dw >= -this.w && (this.w += _dw);
-		Number.isFinite(_dh) && _dh >= -this.h && (this.h += _dh);
-		Number.isFinite(_dd) && _dd >= -this.d && (this.d += _dd);
+		Number.isFinite(_dw) && ((_dw >= -this.w) ? this.w += _dw : this.w = 1);
+		Number.isFinite(_dh) && ((_dh >= -this.h) ? this.h += _dh : this.h = 1);
+		Number.isFinite(_dd) && ((_dd >= -this.d) ? this.d += _dd : this.d = 1);
 		return this;
 	}
 
@@ -133,7 +137,11 @@ class Cube {
 		return this.setAbs(this.x + (this.w - _w)/2, this.y + (this.h - _h)/2, this.z + (this.d - _d)/2, _w, _h, _d);
 	}
 	getCenter() {
-		return {x: this.x + this.w/2, y: this.y + this.h/2, z: this.z + this.d/2};
+		return {x: this.x + Math.floor(this.w/2), y: this.y + Math.floor(this.h/2), z: this.z + Math.floor(this.d/2)};
+	}
+	collapse() {
+		const {x, y, z, w, h, d} = this;
+		return {x, y, z, w, h, d};
 	}
 }
 
@@ -244,7 +252,7 @@ class Brush extends Rect {
 		this.ctx = _canvas.getContext("2d");
 		this.ctx.textAlign = "center";
 		this.ctx.textBaseline = "middle";
-		this.scaleFont(0.75);
+		this.scaleFont(0.6);
 	}
 	scaleFont(_r = 1) {
 		if (_r <= 0 || _r > 1) { throw `Invalid scale for brush.font, ${_r}; requires: 0 < scale <= 1`; }
@@ -265,6 +273,11 @@ class Brush extends Rect {
 	}
 	pixelSpan(_cellSpan, _margin) {
 		return _cellSpan*this.side - _margin*2;
+	}
+	adjustForLineWidth() {
+		const adjust = Math.ceil(this.ctx.lineWidth/2);
+		this.alterAbs(adjust - 1, adjust - 1, 2 - 2*adjust, 2 - 2*adjust);
+		return this;
 	}
 
 	setPos(_x, _y, _margin) {
@@ -331,6 +344,7 @@ class Brush extends Rect {
 		this.ctx.drawImage(_img, this.x, this.y, this.w, this.h);
 	}
 }
+
 class ArenaLayer extends Rect {
 	constructor(_w, _h, _side, _kwargs = {}) {
 		super(0, 0, _w, _h);
@@ -340,8 +354,6 @@ class ArenaLayer extends Rect {
 		this.brush = new Brush(this.canvas, _side);
 
 		this.shouldUpdate = true;
-		this.isGroupLayer = false;
-		this.isMultiLayer = false;
 	}
 
 	verifyResize(_w, _h, _side) {
@@ -380,17 +392,11 @@ class ArenaLayer extends Rect {
 	checkForUpdate() {
 		return this.shouldUpdate;
 	}
-	updateAllLayers() {
-		this.shouldUpdate = true;
+	markForUpdate() {
+		return this.shouldUpdate = true;
 	}
-	updateImageLayers() {
-		this.isImageLayer && (this.shouldUpdate = true);
-	}
-	updateGroupLayers() {
-		this.isGroupLayer && (this.shouldUpdate = true);
-	}
-	updateMultilayers() {
-		this.isMultiLayer && (this.shouldUpdate = true);
+	updateLayerType(_layerType = ArenaLayer) {
+		return this instanceof _layerType && this.markForUpdate();
 	}
 
 	async clearLayer() {
@@ -409,7 +415,6 @@ class ArenaLayer extends Rect {
 		return this.canvas;
 	}
 }
-
 class StackLayer extends ArenaLayer {
 	constructor(_w, _h, _side, _name, _kwargs = {}) {
 		super(_w, _h, _side, _kwargs);
@@ -419,6 +424,49 @@ class StackLayer extends ArenaLayer {
 
 	async paintLayer() {;}
 }
+class MultiLayer extends StackLayer {
+	constructor(_w, _h, _side, _layerName, _kwargs = {}) {
+		super(...arguments);
+
+		this.layers = {};
+		for (const [name, builder] of Object.entries(_kwargs.builders || {})) {
+			this.layers[name] = new builder.layer(this.w, this.h, this.brush.side, name, builder.kwargs);
+		}
+
+		this.targetDrawArea();
+	}
+
+	enactResize(_w, _h, _side) {
+		super.enactResize(_w, _h, _side);
+
+		for (const layer of Object.values(this.layers)) {
+			layer.enactResize(true, this.w, this.h, this.brush.side);
+		}
+	}
+
+	checkForUpdate() {
+		if (super.checkForUpdate()) { return true; }
+		for (const layer of Object.values(this.layers)) {
+			if (layer.checkForUpdate()) { return true;}
+		}
+		return false;
+	}
+	updateLayerType(_layerType) {
+		for (const layer of Object.values(this.layers)) { layer.updateLayerType(_layerType) && this.markForUpdate(); }
+		return this.shouldUpdate;
+	}
+
+	async clearLayer() {
+		this.clearBrushArea();
+	}
+	async paintLayer() {
+		for (const layer of Object.values(this.layers)) {
+			this.brush.ctx.globalCompositeOperation = layer.gco || "source-over";
+			this.brush.draw(await layer.fetchCanvas(...arguments));
+		}
+	}
+}
+
 class ImageLayer extends StackLayer {
 	constructor(_w, _h, _side, _layerName, _kwargs = {}) {
 		super(...arguments);
@@ -443,11 +491,30 @@ class ImageLayer extends StackLayer {
 			return false;
 		});
 		if (!image) { return; }
-		this.brush.setFrom(this).draw(image);
+		this.brush.draw(image);
+	}
+}
+class GuideLayer extends StackLayer {
+	constructor(_w, _h, _side, _layerName, _kwargs = {}) {
+		super(...arguments);
+
+		this.brush.ctx.strokeStyle = _kwargs.stroke || "#3579";
+		this.brush.ctx.lineWidth = Math.floor(this.brush.pixelSpan(0.8, 1));
+
+		this.shapes = [];
+		this.display = undefined;
+	}
+
+	async paintLayer() {
+		if (!this.display) { return; }
+		for (const {style, kwargs} of this.shapes) {
+			style(this.brush, kwargs);
+		}
 	}
 }
 class GroupLayer extends StackLayer {
 	async paintGroup(_group, _style, _cell, _kwargs) {
+		if (!(_style && _cell)) { return; }
 		for (const [i, token] of _group.tokens.entries()) {
 			_kwargs.i = i;
 			!token.removed && !token.hidden && _style(this.brush, _cell, token, _kwargs);
@@ -456,67 +523,9 @@ class GroupLayer extends StackLayer {
 	async paintLayer(_stages) {
 		for (const stage of Object.values(_stages)) {
 			for (const {name, group, kwargs} of stage) {
-				const style = group.styles[this.name]
-				const cell = group.styles.cell;
 				kwargs.single = group.tokens.length <= 1;
-				style && cell && await this.paintGroup(group, style, cell, kwargs);
+				await this.paintGroup(group, group.styles[this.name], group.styles.cell, kwargs);
 			}
-		}
-	}
-}
-class MultiLayer extends StackLayer {
-	constructor(_w, _h, _side, _layerName, _kwargs = {}) {
-		super(...arguments);
-
-		this.layers = {};
-		for (const [name, builder] of Object.entries(_kwargs.builders || {})) {
-			const layer = new builder.layer(this.w, this.h, this.brush.side, name, builder.kwargs);
-
-			layer instanceof ImageLayer && (layer.isImageLayer = true);
-			layer instanceof GroupLayer && (layer.isGroupLayer = true);
-			layer instanceof MultiLayer && (layer.isMultiLayer = true);
-
-			this.layers[name] = layer;
-		}
-
-		this.targetDrawArea();
-	}
-
-	enactResize(_w, _h, _side) {
-		super.enactResize(_w, _h, _side);
-
-		for (const layer of Object.values(this.layers)) {
-			layer.enactResize(true, this.w, this.h, this.brush.side);
-		}
-	}
-
-	checkForUpdate() {
-		if (super.checkForUpdate()) { return true; }
-		for (const layer of Object.values(this.layers)) {
-			if (layer.checkForUpdate()) { return true;}
-		}
-		return false;
-	}
-	updateAllLayers() {
-		for (const layer of Object.values(this.layers)) { layer.updateAllLayers(); }
-	}
-	updateImageLayers() {
-		for (const layer of Object.values(this.layers)) { layer.updateImageLayers(); }
-	}
-	updateGroupLayers() {
-		for (const layer of Object.values(this.layers)) { layer.updateGroupLayers(); }
-	}
-	updateMultiLayers() {
-		for (const layer of Object.values(this.layers)) { layer.updateGroupLayers(); }
-	}
-
-	async clearLayer() {
-		this.clearBrushArea();
-	}
-	async paintLayer() {
-		for (const layer of Object.values(this.layers)) {
-			this.brush.ctx.globalCompositeOperation = layer.gco || "source-over";
-			this.brush.draw(await layer.fetchCanvas(...arguments));
 		}
 	}
 }
@@ -535,7 +544,7 @@ const ARENA_SPECS = {
 			}
 		},
 		light: {layer: StackLayer, kwargs: {bgColour: "#0002"}},
-		guide: {layer: StackLayer}
+		guide: {layer: GuideLayer}
 	}
 };
 
@@ -554,6 +563,7 @@ class Arena extends ArenaLayer {
 		super(_w + 2, _h + 2, Arena.calculateSide(_w, _h), {bgColour: "#000"});
 		this.set(1, 1, _w, _h);
 		this.defaultAxes = _axesColour;
+		this.brush.scaleFont(0.8);
 		this.paintAxes();
 
 		this.lastStage = 0;
@@ -646,22 +656,19 @@ class Arena extends ArenaLayer {
 }
 
 //--------------------------------------------------------------------FINALIZE
-const originChoices = [];
-for (const name of Object.keys(TOKEN_SPECS)) {
-	originChoices.push({name, value: name});
-}
-const presetChoices = [];
-for (const name of Object.keys(GROUP_SPECS)) {
-	presetChoices.push({name, value: name});
-}
-
 module.exports = {
-	originChoices,
-	presetChoices,
+	tokenChoices: buildChoices(TOKEN_SPECS),
+	groupChoices: buildChoices(GROUP_SPECS),
+	arenaChoices: buildChoices(ARENA_SPECS),
 	Rect, Cube,
-	ArenaLayer,
-	StackLayer, GroupLayer,
-	MultiLayer, Arena,
+	ArenaLayer, StackLayer, MultiLayer,
+	ImageLayer, GuideLayer, GroupLayer,
+	Arena,
+	updateHelper: {
+		image: ImageLayer,
+		group: GroupLayer,
+		guide: GuideLayer
+	},
 	createArena: (_w, _h) => {
 		return new Arena(_w, _h);
 	}

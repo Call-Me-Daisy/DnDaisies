@@ -3,7 +3,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const BOT = require("../bot");
 
 const { indexParser, rangeParser } = require("../parsers");
-const { presetChoices, originChoices } = require("../arena");
+const { tokenChoices, groupChoices } = require("../arena");
 //--------------------------------------------------------------------FINALIZE
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -15,7 +15,7 @@ module.exports = {
 			.addStringOption(option => option
 				.setName("preset")
 				.setDescription("A quick-use template to use for the group")
-				.addChoices(...presetChoices)
+				.addChoices(...groupChoices)
 				.setRequired(true)
 			)
 			.addStringOption(option => option
@@ -127,7 +127,7 @@ module.exports = {
 			.addStringOption(option => option
 				.setName("origin")
 				.setDescription("This point of each token will not move (if possible); defaults to center")
-				.addChoices(...originChoices)
+				.addChoices(...tokenChoices)
 			)
 		)
 		.addSubcommand(subcommand => subcommand
