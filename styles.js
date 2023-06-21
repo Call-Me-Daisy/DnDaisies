@@ -87,6 +87,40 @@ STYLES.light = {
 STYLES.light.default = STYLES.general.null;
 
 STYLES.guide = {
+	rect: (_brush, {rect}) => {
+		_brush.setFrom(rect).adjustForLineWidth().strokeRect();
+	},
+	ellipse: (_brush, {rect}) => {
+		_brush.setFrom(rect).adjustForLineWidth().strokeEllipse();
+	},
+	line: (_brush, {r1, r2}) => {
+		_brush.setSpan(1, 1);
+		_brush.ctx.beginPath();
+		_brush.ctx.moveTo(...Object.values(_brush.setPos(r1.x, r1.y).getCenter()));
+		_brush.ctx.lineTo(...Object.values(_brush.setPos(r2.x, r2.y).getCenter()));
+		_brush.ctx.stroke();
+	},
+	cone: (_brush, {rect, theta}) => {
+		const [sin, cos] = [Math.sin(theta), Math.cos(theta)].map(x => Math.floor(x*1e6)/1e6);
+		const {x, y, w, h} = _brush.setFrom(rect, 0).alter(0.5 + sin, 0.5 - cos, 0, -.25);
+		const [x1, y1] = [x + sin*w, y - cos*w];
+		const [dx, dy] = [cos/2*h, sin/2*h];
 
+		_brush.ctx.beginPath();
+		_brush.ctx.moveTo(x, y);
+		_brush.ctx.lineTo(x1 - dx, y1 - dy);
+		_brush.ctx.lineTo(x1 + dx, y1 + dy);
+		_brush.ctx.closePath();
+		_brush.ctx.stroke();
+	},
+	sundail: (_brush, {rect, r1, r2}) => {
+		STYLES.guide.ellipse(_brush, {rect});
+		STYLES.guide.line(_brush, {r1, r2});
+	},
+	spider: (_brush, {r1, rs}) => {
+		for (const r2 of rs) {
+			STYLES.guide.line(_brush, {r1, r2});
+		}
+	}
 };
 STYLES.guide.default = STYLES.general.null;

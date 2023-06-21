@@ -43,7 +43,7 @@ module.exports = {
 			.setDescription("Destroy the arena in the current channel")
 			.addBooleanOption(option => option
 				.setName("save")
-				.setDescription("If true, a save-state of the arena will be sent to the HomeThread; defaults to true")
+				.setDescription("If true, a save-state of the arena will be sent to the HomeThread; defaults to false")
 			)
 		)
 		.addSubcommand(subcommand => subcommand
@@ -102,7 +102,7 @@ module.exports = {
 			return;
 		},
 		destroy: async function(_interaction, {save}) {
-			BOT.utils.closeArena(_interaction, save);
+			BOT.utils.closeArena(_interaction, save === true);
 
 			return new BOT.FlagHandler()
 				.setDisplay(false)

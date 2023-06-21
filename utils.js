@@ -52,3 +52,7 @@ UTILS.fetchJSON = async function(_url) {
 UTILS.fetchText = async function(_url) {
 	return UTILS.fetchFromUrl(_url).then((response) => { return response.text(); });
 }
+
+UTILS.buildChoices = function(_spec) {
+	return Object.keys(_spec).map((name) => { return {name, value: name}; });
+}
