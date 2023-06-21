@@ -226,22 +226,29 @@ module.exports = {
 
 			for (const lineRaw of (await fetchText(url)).split("\r\n")) {
 				if (!lineRaw.length || lineRaw.startsWith("//")) { continue; }
-				const line = lineRaw.split(" ");
+				const line = lineRaw.toLowerCase().split(" ");
 
-				const command = BOT.commands[line[0].toLowerCase()];
-				const optionTypes = command.optionTypes[line[1].toLowerCase()];
+				const command = BOT.commands[line[0]];
+				let optionTypes = command.optionTypes, i = 1;
+				while (optionTypes[line[i]] !== undefined) { optionTypes = optionTypes[line[i++]]; }
+				const exe = line.slice(0, i).reduce((exe, subKey) => exe[subKey] || exe, command.execute);
 
-				const options = _interaction.options._hoistedOptions = [];
-				for (const argument of line.slice(2)) {
+				const {_hoistedOptions: options} = _interaction.options = {
+					_group: (i > 2) ? line[1] : undefined,
+					_subcommand: line[i - 1],
+					_hoistedOptions: []
+				};
+
+				for (const argument of lineRaw.split(" ").slice(i)) {
 					const index = argument.indexOf(":");
 					const name = argument.slice(0, index).toLowerCase();
 					options.push({name, value: parseOption[optionTypes[name]](argument.slice(index + 1))});
 				}
-				await command.execute[line[1].toLowerCase()](_interaction, BOT.utils.getOptions(_interaction));
+				await exe(_interaction, BOT.utils.getOptions(_interaction));
 			}
 
 			return new BOT.FlagHandler()
-				.setUpdate({group: true, multi: true})
+				.setUpdate()
 			;
 		},
 		ping: async function(_interaction) {
