@@ -5,6 +5,97 @@ const STYLES = require("../styles");
 
 const { coordParser, rangeParser } = require("../parsers");
 const { Rect } = require("../arena");
+//--------------------------------------------------------------------HELPERS
+const SHAPE_MAKER = {
+	box: ({range, origin, width, height}) => {
+		const rect = new Rect();
+		if (range) { rect.setFrom(rangeParser.parse(range.split(",")[0])); }
+		else {
+			rect.setFrom(coordParser.parse(origin.split(":")[0].split(",")[0]))
+				.alterPos((1 - width)/2, (1 - height)/2)
+				.setSpan(width, height)
+			;
+		}
+		return {
+			kwargs: {rect: rect.collapse()},
+			style: STYLES.guide.rect,
+			description: rangeParser.unparse(rect)
+		};
+	},
+	ellipse: ({range, origin, width, height}) => {
+		const rect = new Rect();
+		if (range) { rect.setFrom(rangeParser.parse(range.split(",")[0])); }
+		else {
+			rect.setFrom(coordParser.parse(origin.split(":")[0].split(",")[0]))
+				.alterPos(-width/2, -height/2)
+				.setSpan(width, height)
+			;
+		}
+		return {
+			kwargs: {rect: rect.collapse()},
+			style: STYLES.guide.ellipse,
+			description: rangeParser.unparse(rect)
+		};
+	},
+	line: ({origin, endpoint}) => {
+		const points = [];
+		origin && points.push(...coordParser.parseMany(origin.split(":")[0].split(",")[0]));
+		endpoint && points.push(...coordParser.parseMany(endpoint.split(":")[0].split(",")[0]));
+		if (points.length < 2) { throw "UserError: Did not provide enough points to make a line (2)"; }
+
+		return {
+			kwargs: {r1: points[0], r2: points[1]},
+			style: STYLES.guide.line,
+			description: coordParser.unparseAry(points.slice(0, 2)).join(" -> ")
+		};
+	},
+	cone: ({origin, height, base, theta}) => {
+		const rect = new Rect()
+			.setFrom(coordParser.parse(origin.split(":")[0].split(",")[0]))
+			.setSpan(height - 1, (base || height) - 1)
+			.collapse()
+		;
+		return {
+			kwargs: {rect, theta: theta*Math.PI/180},
+			style: STYLES.guide.cone,
+			description: `${coordParser.unparse(rect)} (width: ${rect.width})`
+		};
+	},
+	sundail: ({origin, diameter, endpoint}) => {
+		const points = [];
+		origin && points.push(...coordParser.parseMany(origin.split(":").join(",")));
+		endpoint && points.push(...coordParser.parseMany(endpoint.split(":").join(",")));
+
+		const r1 = points[0];
+		const r2 = points[1] || {x: r1.x + diameter/2, y: r1.y}
+		if (isNaN(r2.x)) { throw "UserError: Did not supply enough information to create a sundail (2 point/widths)"; }
+
+		const radius = Math.floor(Math.sqrt((r1.x - r2.x)**2 + (r1.y - r2.y)**2)*1e6)/1e6;
+		const rect = new Rect()
+			.setFrom(r1)
+			.alterPos(-radius, -radius)
+			.setSpan(2*radius + 1, 2*radius + 1)
+			.collapse()
+		;
+		return {
+			kwargs: {r1, r2, rect},
+			style: STYLES.guide.sundail,
+			description: coordParser.unparseAry([r1, r2]).join(" -> ")
+		};
+	},
+	spider: ({origin, endpoint}) => {
+		const points = [];
+		origin && points.push(...coordParser.parseMany(origin.split(":").join(",")));
+		endpoint && points.push(...coordParser.parseMany(endpoint.split(":").join(",")));
+		if (points.length < 2) { throw "UserError: Did not provide enough points to make a spider (2)"; }
+
+		return {
+			kwargs: {r1: points[0], rs: points.slice(1)},
+			style: STYLES.guide.spider,
+			description: coordParser.unparseAry(points.slice(0, 2)).join(" -> ") + ", ..."
+		};
+	}
+};
 //--------------------------------------------------------------------FINALIZE
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -151,99 +242,9 @@ module.exports = {
 		)
 	,
 	execute: {
-		create: {
-			box: async function (_interaction, {range, origin, width, height}) {
-				const rect = new Rect();
-				if (range) { rect.setFrom(rangeParser.parse(range.split(",")[0])); }
-				else {
-					rect.setFrom(coordParser.parse(origin.split(":")[0].split(",")[0]))
-						.alterPos((1 - width)/2, (1 - height)/2)
-						.setSpan(width, height)
-					;
-				}
-				return {
-					kwargs: {rect: rect.collapse()},
-					style: STYLES.guide.rect,
-					description: rangeParser.unparse(rect)
-				};
-			},
-			ellipse: async function (_interaction, {range, origin, width, height}) {
-				const rect = new Rect();
-				if (range) { rect.setFrom(rangeParser.parse(range.split(",")[0])); }
-				else {
-					rect.setFrom(coordParser.parse(origin.split(":")[0].split(",")[0]))
-						.alterPos(-width/2, -height/2)
-						.setSpan(width, height)
-					;
-				}
-				return {
-					kwargs: {rect: rect.collapse()},
-					style: STYLES.guide.ellipse,
-					description: rangeParser.unparse(rect)
-				};
-			},
-			line: async function (_interaction, {origin, endpoint}) {
-				const points = [];
-				origin && points.push(...coordParser.parseMany(origin.split(":")[0].split(",")[0]));
-				endpoint && points.push(...coordParser.parseMany(endpoint.split(":")[0].split(",")[0]));
-				if (points.length < 2) { throw "UserError: Did not provide enough points to make a line (2)"; }
-
-				return {
-					kwargs: {r1: points[0], r2: points[1]},
-					style: STYLES.guide.line,
-					description: coordParser.unparseAry(points.slice(0, 2)).join(" -> ")
-				};
-			},
-			cone: async function (_interaction, {origin, height, base, theta}) {
-				const rect = new Rect()
-					.setFrom(coordParser.parse(origin.split(":")[0].split(",")[0]))
-					.setSpan(height - 1, (base || height) - 1)
-					.collapse()
-				;
-				return {
-					kwargs: {rect, theta: theta*Math.PI/180},
-					style: STYLES.guide.cone,
-					description: `${coordParser.unparse(rect)} (width: ${rect.width})`
-				};
-			},
-			sundail: async function (_interaction, {origin, diameter, endpoint}) {
-				const points = [];
-				origin && points.push(...coordParser.parseMany(origin.split(":").join(",")));
-				endpoint && points.push(...coordParser.parseMany(endpoint.split(":").join(",")));
-
-				const r1 = points[0];
-				const r2 = points[1] || {x: r1.x + diameter/2, y: r1.y}
-				if (isNaN(r2.x)) { throw "UserError: Did not supply enough information to create a sundail (2 point/widths)"; }
-
-				const radius = Math.floor(Math.sqrt((r1.x - r2.x)**2 + (r1.y - r2.y)**2)*1e6)/1e6;
-				const rect = new Rect()
-					.setFrom(r1)
-					.alterPos(-radius, -radius)
-					.setSpan(2*radius + 1, 2*radius + 1)
-					.collapse()
-				;
-				return {
-					kwargs: {r1, r2, rect},
-					style: STYLES.guide.sundail,
-					description: coordParser.unparseAry([r1, r2]).join(" -> ")
-				};
-			},
-			spider: async function (_interaction, {origin, endpoint}) {
-				const points = [];
-				origin && points.push(...coordParser.parseMany(origin.split(":").join(",")));
-				endpoint && points.push(...coordParser.parseMany(endpoint.split(":").join(",")));
-				if (points.length < 2) { throw "UserError: Did not provide enough points to make a spider (2)"; }
-
-				return {
-					kwargs: {r1: points[0], rs: points.slice(1)},
-					style: STYLES.guide.spider,
-					description: coordParser.unparseAry(points.slice(0, 2)).join(" -> ") + ", ..."
-				};
-			}
-		},
-		archive: async function(_interaction, _options) {
+		create: async function(_interaction, _options) {
 			const guideLayer = BOT.utils.requireGuide(_interaction);
-			const shape = SHAPE_MAKER[_options.preset](_options);
+			const shape = SHAPE_MAKER[_interaction.options._subcommand](_options);
 			shape.description = `${_options.preset}\t- ${shape.description}`;
 
 			(_options.index === undefined)
