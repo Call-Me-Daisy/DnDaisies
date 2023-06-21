@@ -1,5 +1,17 @@
 # Changelog
 
+## v3.3.0-Alpha
+### Usable changes:
+	- Added /guide {create, clear, list, toggle}
+	- /guide create has six subcommands: box, ellipse, line, cone, sundail, spider
+### Noticeable changes:
+	- /arena destroy; save now defaults to false
+### Hidden changes:
+	- Collapsed all update...Layers() into updateLayerType(_layerType) for simpler extension
+	- Simplified /flag update
+### Bugfix:
+	- /macro parse now works for SubcommandGroups
+
 ## v3.2.0-Alpha
 ### Usable changes:
 	- Added /macro splitscreen

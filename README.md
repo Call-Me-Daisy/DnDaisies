@@ -11,16 +11,16 @@
 	- Keeps channels clear by both deleting BOT responses and outputting to dedicated thread
 
 ## Arena Features:
-	- Multiple overlapping layers (including background image)
+	- Multiple overlapping layers (including optional background image)
 	- Tokens can be easily colour-coded with any hex-colour (including alpha/opacity)
 	- Automatically rebuilds and displays the map whenever it changes
 
 ## TTG Features:
 	- Versatile numeric diceroller command
+	- Geometric guides to help visualise movements and areas of effect
 
 ## Future Features:
 	- Undo command to revert previous command
-	- Geometric guides
 	- Light/Visibility display
 
 ## Links:
