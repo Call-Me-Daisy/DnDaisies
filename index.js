@@ -23,10 +23,35 @@ for (const file of fs.readdirSync(CONFIG.command_dir).filter(file => file.endsWi
 	BOT.commands[command.data.name] = command;
 }
 
+function loadJSON(_filePath) {
+	return JSON.parse(fs.readFileSync(_filePath, "utf8"));
+}
+function updateJSON(_filePath, _key, _value) {
+	const data = loadJSON(_filePath);
+	data[_key] = _value;
+
+	fs.writeFile(_filePath, JSON.stringify(data), "utf8", (err) => {
+		if (err) { throw err; }
+	});
+}
+
 //--------------------------------------------------------------------MAIN
 BOT.once("ready", async () => {
 	BOT.log(`Logged in as ${BOT.user.tag}`);
 	BOT.log(`BOT running with ${Object.keys(BOT.commands).length} commands`);
+
+	const {should_announce, announcement} = loadJSON("data/update.json");
+	if (should_announce) {
+		const defaultChannels = loadJSON("./data/default-channels.json");
+		for (const [id, guild] of BOT.guilds.cache.entries()) {
+			const channel = (defaultChannels[id] !== undefined)
+				? guild.channels.cache.get(defaultChannels[id])
+				: guild.channels.cache.find(c => c.type == 0 && c.permissionsFor(BOT.user).has([FLAGS.ViewChannel, FLAGS.SendMessages]))
+			;
+			channel.send({content: announcement}).then((msg) => msg.pin);
+		}
+		updateJSON("data/update.json", "should_announce", false);
+	}
 });
 
 BOT.on("threadDelete", async (_thread) => {
@@ -51,7 +76,7 @@ BOT.on("interactionCreate", async (_interaction) => {
 	if (_interaction.channel.isThread()) {
 		if (_interaction.channel.ownerId !== CONFIG.bot_id) {
 			_interaction.reply({
-				content: "I don't work properly in threads - try sending that to the parent channel",
+				content: "I don't always work properly in threads - try sending that to the parent channel",
 				ephemeral: true
 			});
 			return;
@@ -76,6 +101,8 @@ BOT.on("interactionCreate", async (_interaction) => {
 		}
 		const exe = Object.values(_interaction.options).reduce((exe, subKey) => exe[subKey] || exe, command.execute);
 		(await exe(_interaction, BOT.utils.getOptions(_interaction)) || new BOT.FlagHandler()).resolve(_interaction);
+
+		updateJSON("./data/default-channels.json", _interaction.guildId, _interaction.channelId);
 	} catch (error) {
 		BOT.err(error);
 		await _interaction.editReply(`Error while executing ${_interaction.commandName} command!\n${error}`);
