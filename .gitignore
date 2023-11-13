@@ -5,4 +5,5 @@ package-lock.json
 logs/
 cache/
 
+data/default-channels.json
 data/private-config.json
