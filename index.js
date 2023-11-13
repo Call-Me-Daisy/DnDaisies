@@ -44,12 +44,19 @@ BOT.once("ready", async () => {
 	if (should_announce) {
 		const defaultChannels = loadJSON("./data/default-channels.json");
 		for (const [id, guild] of BOT.guilds.cache.entries()) {
+<<<<<<< HEAD
 			let channel = defaultChannels[id] && guild.channels.cache.get(defaultChannels[id]);
 			if (channel === undefined) {
 				channel = guild.channels.cache.filter(
 					c => c.type === 0 && c.permissionsFor(BOT.user).has([FLAGS.ViewChannel, FLAGS.SendMessages])
 				).values().next().value;
 			}
+=======
+			const channel = (defaultChannels[id] !== undefined)
+				? guild.channels.cache.get(defaultChannels[id])
+				: guild.channels.cache.find(c => c.type == 0 && c.permissionsFor(BOT.user).has([FLAGS.ViewChannel, FLAGS.SendMessages]))
+			;
+>>>>>>> eb33a3750a86babac31ee41a8f1562684ed80296
 			channel.send({content: announcement}).then((msg) => msg.pin);
 		}
 		updateJSON("data/update.json", "should_announce", false);
