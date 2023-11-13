@@ -43,12 +43,20 @@ BOT.once("ready", async () => {
 	const {should_announce, announcement} = loadJSON("data/update.json");
 	if (should_announce) {
 		const defaultChannels = loadJSON("./data/default-channels.json");
-		for (const [id, guild] of BOT.guilds.cache.entries()) {
-			const channel = (defaultChannels[id] !== undefined)
-				? guild.channels.cache.get(defaultChannels[id])
-				: guild.channels.cache.find(c => c.type == 0 && c.permissionsFor(BOT.user).has([FLAGS.ViewChannel, FLAGS.SendMessages]))
+		for (const guild of BOT.guilds.cache.values()) {
+			let channel = defaultChannels[guild.id] && guild.channels.cache.get(defaultChannels[guild.id]);
+			if (channel === undefined) {
+				for (const [id, c] of guild.channels.cache.entries()) {
+					if (c.type == 0 && c.permissionsFor(BOT.user).has([FLAGS.ViewChannel, FLAGS.SendMessages, FLAGS.ManageMessages])) {
+						channel = c;
+						break;
+					}
+				}
+			}
+			(channel === undefined)
+				? guild.leave().then(g => BOT.log(`BOT left guild ${g.id} due to lack of permissions.`))
+				: channel.send({content: announcement}).then((msg) => msg.pin)
 			;
-			channel.send({content: announcement}).then((msg) => msg.pin);
 		}
 		updateJSON("data/update.json", "should_announce", false);
 	}
