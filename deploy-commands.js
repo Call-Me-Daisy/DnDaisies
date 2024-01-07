@@ -4,7 +4,6 @@ const { REST, Routes } = require("discord.js");
 
 const CONFIG = require("./config");
 
-const [log2, err2] = require("./utils").createLoggerFunctionsFromFileNames("logs/dep_log.txt", "logs/dep_err.txt");
 //--------------------------------------------------------------------MAIN
 const commands = [];
 for (const file of fs.readdirSync("./commands").filter(file => file.endsWith(".js"))) {
@@ -12,7 +11,7 @@ for (const file of fs.readdirSync("./commands").filter(file => file.endsWith(".j
 }
 
 //--------------------------------------------------------------------FINALIZE
-log2(`Reloading ${commands.length} guild slash-commands`);
+console.log(`Reloading ${commands.length} guild slash-commands`);
 const rest = new REST({version: "10"}).setToken(CONFIG.bot_token);
 
 rest.put(
