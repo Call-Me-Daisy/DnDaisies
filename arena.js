@@ -1,6 +1,5 @@
 const { createCanvas, loadImage } = require("canvas");
 
-const BOT = require("./bot");
 const STYLES = require("./styles");
 
 const { fetchFromUrl, buildChoices } = require("./utils");
@@ -487,7 +486,7 @@ class ImageLayer extends StackLayer {
 	async paintLayer() {
 		if (!this.imgUrl) { return; }
 		const image = await loadImage(this.imgUrl).catch((e) => {
-			BOT.err(e);
+			console.error(e);
 			return false;
 		});
 		if (!image) { return; }

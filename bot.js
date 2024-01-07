@@ -5,13 +5,11 @@ const { Client, GatewayIntentBits } = require("discord.js");
 const CONFIG = require("./config");
 
 const { updateHelper } = require("./arena");
-const { createLoggerFunctionsFromFileNames } = require("./utils");
 //--------------------------------------------------------------------MAIN
 const BOT = module.exports = new Client({intents: [
 	GatewayIntentBits.Guilds,
 	GatewayIntentBits.GuildMessages
 ]});
-[BOT.log, BOT.err] = createLoggerFunctionsFromFileNames("logs/log.txt", "logs/err.txt");
 
 BOT.arenas = new class {
 	set(_interaction, _arena) { return this[_interaction.channelId] = _arena; }
@@ -27,7 +25,7 @@ BOT.commands = {};
 BOT.utils = {
 	//Simple Wrappers
 	deleteReply: (_interaction) => {
-		_interaction.deleteReply().catch((error) => { BOT.err(`deleteReply failed: ${error}`); });
+		_interaction.deleteReply().catch((err) => { console.error(`deleteReply failed: ${err}`); });
 	},
 	getChannel: async (_interaction) => {
 		return _interaction.channel || BOT.channels.cache.get(_interaction.channelId);
@@ -114,7 +112,7 @@ BOT.utils = {
 		fs.writeFileSync(path, _dataString, "utf8");
 		return BOT.utils.attachHomeThread(_interaction, path, _fileName)
 			.then((msg) => {
-				fs.unlink(path, (err) => { err && BOT.err(err); });
+				fs.unlink(path, (err) => { err && console.error(err); });
 				msg.pin();
 			})
 		;
@@ -131,8 +129,8 @@ BOT.utils = {
 	saveArena: async (_interaction) => {
 		const pack = BOT.arenas.fetch(_interaction)?.pack();
 
-		if (pack === undefined) { return BOT.err("Warning: saveArena called on empty channel"); }
-		if (!Object.values(pack.groups).length) { return BOT.err("Warning: saveArena called on empty arena"); }
+		if (pack === undefined) { return console.error("Warning: saveArena called on empty channel"); }
+		if (!Object.values(pack.groups).length) { return console.error("Warning: saveArena called on empty arena"); }
 
 		return BOT.utils.sendAsFile(_interaction, JSON.stringify(pack), "pack.json");
 	},

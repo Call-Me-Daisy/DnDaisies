@@ -1,9 +1,8 @@
-ssh/*
-node_modules/*
+ssh/
+node_modules/
 package-lock.json
 
-logs/
-cache/
+cache/*
 
 data/default-channels.json
 data/private-config.json
