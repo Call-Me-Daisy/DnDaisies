@@ -248,7 +248,7 @@ module.exports = {
 			}
 
 			return new BOT.FlagHandler()
-				.setUpdate()
+				.setUpdate({all: true})
 			;
 		},
 		ping: async function(_interaction) {

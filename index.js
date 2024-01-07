@@ -4,6 +4,27 @@ const { Flags: FLAGS } = require("discord.js").PermissionsBitField;
 const CONFIG = require("./config");
 const BOT = require("./bot");
 //--------------------------------------------------------------------GLOBAL
+class DataStateJSON {
+	constructor(_filePath) {
+		this.filePath = _filePath;
+		this.data = JSON.parse(fs.readFileSync(this.filePath, "utf8"));
+	}
+
+	async save() {
+		fs.writeFile(this.filePath, JSON.stringify(this.data), "utf8", (err) => {
+			if (err) { throw err; }
+		});
+	}
+	async update(_key, _val) {
+		if (this.data[_key] !== _val) {
+			this.data[_key] = _val;
+			this.save();
+		}
+	}
+}
+const stateDefaultChannels = new DataStateJSON("./data/default-channels.json");
+const stateUpdate = new DataStateJSON("./data/update.json");
+
 function buildOptionTypes(_data) {
 	if (_data.constructor.name.slice(-6) === "Option") { return _data.type; }
 
@@ -15,7 +36,7 @@ for (const file of fs.readdirSync(CONFIG.command_dir).filter(file => file.endsWi
 	const filePath = `${CONFIG.command_dir}/${file}`;
 	const command = require(filePath);
 	if (!("data" in command && "execute" in command)) {
-		BOT.log(`[WARNING] The command at ${filePath} is missing a required 'data' and/or 'execute' property`);
+		console.log(`[WARNING] The command at ${filePath} is missing a required 'data' and/or 'execute' property`);
 		continue;
 	}
 
@@ -23,28 +44,15 @@ for (const file of fs.readdirSync(CONFIG.command_dir).filter(file => file.endsWi
 	BOT.commands[command.data.name] = command;
 }
 
-function loadJSON(_filePath) {
-	return JSON.parse(fs.readFileSync(_filePath, "utf8"));
-}
-function updateJSON(_filePath, _key, _value) {
-	const data = loadJSON(_filePath);
-	data[_key] = _value;
-
-	fs.writeFile(_filePath, JSON.stringify(data), "utf8", (err) => {
-		if (err) { throw err; }
-	});
-}
-
 //--------------------------------------------------------------------MAIN
 BOT.once("ready", async () => {
-	BOT.log(`Logged in as ${BOT.user.tag}`);
-	BOT.log(`BOT running with ${Object.keys(BOT.commands).length} commands`);
+	console.log(`Logged in as ${BOT.user.tag}`);
+	console.log(`BOT running with ${Object.keys(BOT.commands).length} commands`);
 
-	const {should_announce, announcement} = loadJSON("data/update.json");
+	const {should_announce, announcement} = stateUpdate.data;
 	if (should_announce) {
-		const defaultChannels = loadJSON("./data/default-channels.json");
 		for (const guild of BOT.guilds.cache.values()) {
-			let channel = defaultChannels[guild.id] && guild.channels.cache.get(defaultChannels[guild.id]);
+			let channel = stateDefaultChannels[guild.id] && guild.channels.cache.get(stateDefaultChannels[guild.id]);
 			if (channel === undefined) {
 				for (const [id, c] of guild.channels.cache.entries()) {
 					if (c.type == 0 && c.permissionsFor(BOT.user).has([FLAGS.ViewChannel, FLAGS.SendMessages, FLAGS.ManageMessages])) {
@@ -54,18 +62,18 @@ BOT.once("ready", async () => {
 				}
 			}
 			(channel === undefined)
-				? guild.leave().then(g => BOT.log(`BOT left guild ${g.id} due to lack of permissions.`))
+				? guild.leave().then(g => console.log(`BOT left guild ${g.id} due to lack of permissions.`))
 				: channel.send({content: announcement}).then((msg) => msg.pin)
 			;
 		}
-		updateJSON("data/update.json", "should_announce", false);
+		stateUpdate.update("should_announce", false);
 	}
 });
 
 BOT.on("threadDelete", async (_thread) => {
 	for (const [id, arena] of Object.entries(BOT.arenas)) {
 		if (_thread === arena.homeThread) {
-			BOT.log(`HomeThread in #${id} was deleted`);
+			console.log(`HomeThread in #${id} was deleted`);
 			arena.homeThread = undefined;
 			return;
 		}
@@ -95,7 +103,7 @@ BOT.on("interactionCreate", async (_interaction) => {
 
 	const command = _interaction.client.commands[_interaction.commandName];
 	if (command === undefined) {
-		BOT.err(`CommandError: Command ${_interaction.commandName} not found`);
+		console.error(`CommandError: Command ${_interaction.commandName} not found`);
 		return;
 	}
 
@@ -110,9 +118,9 @@ BOT.on("interactionCreate", async (_interaction) => {
 		const exe = Object.values(_interaction.options).reduce((exe, subKey) => exe[subKey] || exe, command.execute);
 		(await exe(_interaction, BOT.utils.getOptions(_interaction)) || new BOT.FlagHandler()).resolve(_interaction);
 
-		updateJSON("./data/default-channels.json", _interaction.guildId, _interaction.channelId);
+		stateDefaultChannels.update(_interaction.guildId, _interaction.channelId);
 	} catch (error) {
-		BOT.err(error);
+		console.error(error);
 		await _interaction.editReply(`Error while executing ${_interaction.commandName} command!\n${error}`);
 		setTimeout(() => { BOT.utils.deleteReply(_interaction); }, CONFIG.reply_duration);
 	}
