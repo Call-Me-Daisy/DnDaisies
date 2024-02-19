@@ -251,7 +251,7 @@ class Brush extends Rect {
 		this.ctx = _canvas.getContext("2d");
 		this.ctx.textAlign = "center";
 		this.ctx.textBaseline = "middle";
-		this.scaleFont(0.6);
+		this.scaleFont(0.75);
 	}
 	scaleFont(_r = 1) {
 		if (_r <= 0 || _r > 1) { throw `Invalid scale for brush.font, ${_r}; requires: 0 < scale <= 1`; }
@@ -542,7 +542,7 @@ const ARENA_SPECS = {
 				}
 			}
 		},
-		light: {layer: StackLayer, kwargs: {bgColour: "#0002"}},
+		light: {layer: StackLayer, kwargs: {bgColour: "#0001"}},
 		guide: {layer: GuideLayer}
 	}
 };
@@ -562,7 +562,7 @@ class Arena extends ArenaLayer {
 		super(_w + 2, _h + 2, Arena.calculateSide(_w, _h), {bgColour: "#000"});
 		this.set(1, 1, _w, _h);
 		this.defaultAxes = _axesColour;
-		this.brush.scaleFont(0.8);
+		this.brush.scaleFont(0.9);
 		this.paintAxes();
 
 		this.lastStage = 0;
