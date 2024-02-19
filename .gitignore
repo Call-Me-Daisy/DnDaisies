@@ -3,6 +3,7 @@ node_modules/*
 package-lock.json
 
 cache/
+logs/
 
 data/default-channels.json
 data/private-config.json
