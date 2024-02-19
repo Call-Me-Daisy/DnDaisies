@@ -485,8 +485,8 @@ class ImageLayer extends StackLayer {
 	}
 	async paintLayer() {
 		if (!this.imgUrl) { return; }
-		const image = await loadImage(this.imgUrl).catch((e) => {
-			console.error(e);
+		const image = await loadImage(this.imgUrl).catch((error) => {
+			log.error(error);
 			return false;
 		});
 		if (!image) { return; }

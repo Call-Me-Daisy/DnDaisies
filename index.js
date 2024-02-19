@@ -1,8 +1,11 @@
 const fs = require("fs");
 
 const { Flags: FLAGS } = require("discord.js").PermissionsBitField;
+
 const CONFIG = require("./config");
 const BOT = require("./bot");
+
+const { log } = require("./utils");
 //--------------------------------------------------------------------GLOBAL
 class DataStateJSON {
 	constructor(_filePath) {
@@ -36,7 +39,7 @@ for (const file of fs.readdirSync(CONFIG.command_dir).filter(file => file.endsWi
 	const filePath = `${CONFIG.command_dir}/${file}`;
 	const command = require(filePath);
 	if (!("data" in command && "execute" in command)) {
-		console.log(`[WARNING] The command at ${filePath} is missing a required 'data' and/or 'execute' property`);
+		log.warn(`The command at ${filePath} is missing a required 'data' and/or 'execute' property`);
 		continue;
 	}
 
@@ -46,8 +49,9 @@ for (const file of fs.readdirSync(CONFIG.command_dir).filter(file => file.endsWi
 
 //--------------------------------------------------------------------MAIN
 BOT.once("ready", async () => {
-	console.log(`Logged in as ${BOT.user.tag}`);
-	console.log(`BOT running with ${Object.keys(BOT.commands).length} commands`);
+	log.clear();
+	log.info(`Logged in as ${BOT.user.tag}`);
+	log.info(`BOT running with ${Object.keys(BOT.commands).length} commands`);
 
 	const {should_announce, announcement} = stateUpdate.data;
 	if (should_announce) {
@@ -62,7 +66,7 @@ BOT.once("ready", async () => {
 				}
 			}
 			(channel === undefined)
-				? guild.leave().then(g => console.log(`BOT left guild ${g.id} due to lack of permissions.`))
+				? guild.leave().then(g => log.info(`BOT left guild ${g.id} due to lack of permissions.`))
 				: channel.send({content: announcement}).then((msg) => msg.pin)
 			;
 		}
@@ -73,7 +77,7 @@ BOT.once("ready", async () => {
 BOT.on("threadDelete", async (_thread) => {
 	for (const [id, arena] of Object.entries(BOT.arenas)) {
 		if (_thread === arena.homeThread) {
-			console.log(`HomeThread in #${id} was deleted`);
+			log.info(`HomeThread in #${id} was deleted`);
 			arena.homeThread = undefined;
 			return;
 		}
@@ -103,7 +107,7 @@ BOT.on("interactionCreate", async (_interaction) => {
 
 	const command = _interaction.client.commands[_interaction.commandName];
 	if (command === undefined) {
-		console.error(`CommandError: Command ${_interaction.commandName} not found`);
+		log.warn(`CommandError: Command ${_interaction.commandName} not found`);
 		return;
 	}
 
@@ -120,7 +124,8 @@ BOT.on("interactionCreate", async (_interaction) => {
 
 		stateDefaultChannels.update(_interaction.guildId, _interaction.channelId);
 	} catch (error) {
-		console.error(error);
+		log.error(error);
+
 		await _interaction.editReply(`Error while executing ${_interaction.commandName} command!\n${error}`);
 		setTimeout(() => { BOT.utils.deleteReply(_interaction); }, CONFIG.reply_duration);
 	}
