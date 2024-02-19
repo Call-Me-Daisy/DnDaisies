@@ -439,7 +439,7 @@ class MultiLayer extends StackLayer {
 		super.enactResize(_w, _h, _side);
 
 		for (const layer of Object.values(this.layers)) {
-			layer.enactResize(true, this.w, this.h, this.brush.side);
+			layer.enactResize(this.w, this.h, this.brush.side);
 		}
 	}
 
