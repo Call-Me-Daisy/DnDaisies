@@ -49,29 +49,30 @@ for (const file of fs.readdirSync(CONFIG.command_dir).filter(file => file.endsWi
 
 //--------------------------------------------------------------------MAIN
 BOT.once("ready", async () => {
-	log.clear();
-	log.info(`Logged in as ${BOT.user.tag}`);
-	log.info(`BOT running with ${Object.keys(BOT.commands).length} commands`);
+	log.clear().then(() => {
+		log.info(`Logged in as ${BOT.user.tag}`);
+		log.info(`BOT running with ${Object.keys(BOT.commands).length} commands`);
 
-	const {should_announce, announcement} = stateUpdate.data;
-	if (should_announce) {
-		for (const guild of BOT.guilds.cache.values()) {
-			let channel = stateDefaultChannels[guild.id] && guild.channels.cache.get(stateDefaultChannels[guild.id]);
-			if (channel === undefined) {
-				for (const [id, c] of guild.channels.cache.entries()) {
-					if (c.type == 0 && c.permissionsFor(BOT.user).has([FLAGS.ViewChannel, FLAGS.SendMessages, FLAGS.ManageMessages])) {
-						channel = c;
-						break;
+		const {should_announce, announcement} = stateUpdate.data;
+		if (should_announce) {
+			for (const guild of BOT.guilds.cache.values()) {
+				let channel = stateDefaultChannels[guild.id] && guild.channels.cache.get(stateDefaultChannels[guild.id]);
+				if (channel === undefined) {
+					for (const [id, c] of guild.channels.cache.entries()) {
+						if (c.type == 0 && c.permissionsFor(BOT.user).has([FLAGS.ViewChannel, FLAGS.SendMessages, FLAGS.ManageMessages])) {
+							channel = c;
+							break;
+						}
 					}
 				}
+				(channel === undefined)
+					? guild.leave().then(g => log.info(`BOT left guild ${g.id} due to lack of permissions.`))
+					: channel.send({content: announcement}).then((msg) => msg.pin)
+				;
 			}
-			(channel === undefined)
-				? guild.leave().then(g => log.info(`BOT left guild ${g.id} due to lack of permissions.`))
-				: channel.send({content: announcement}).then((msg) => msg.pin)
-			;
+			stateUpdate.update("should_announce", false);
 		}
-		stateUpdate.update("should_announce", false);
-	}
+	});
 });
 
 BOT.on("threadDelete", async (_thread) => {

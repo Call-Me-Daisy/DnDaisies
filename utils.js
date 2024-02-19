@@ -19,8 +19,10 @@ const UTILS = module.exports = {};
 UTILS.log = {
 	raw: logRaw,
 
-	clear: () => {
-		fs.writeFileSync(logOptions.folderPath + logOptions.fileName + logOptions.fileNameExtension, '')
+	clear: async () => {
+		return fs.writeFile(logOptions.folderPath + logOptions.fileName + logOptions.fileNameExtension, '', (error) => {
+			error && log.error(error);
+		});
 	},
 	standardLog: (_logger, _obj) => {
 		(_obj.stack)
